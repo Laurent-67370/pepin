@@ -7,7 +7,7 @@ Type=simple
 User=www-data
 WorkingDirectory=/opt/pepin-scores
 ExecStart=/usr/bin/node /opt/pepin-scores/pepin-scores.js
-Environment=PORT=3210
+Environment=PORT=3215
 Environment=DATA_DIR=/opt/pepin-scores/data
 Environment=ALLOW_ORIGINS=https://laurent-67370.github.io,https://pepin.lhusser.fr
 Restart=on-failure
