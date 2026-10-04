@@ -7,7 +7,8 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - 12 mondes : verger, racines, cime, forêt givrée, lac, nid du frelon, dunes, grotte de cristal, marais, volcan, nuages, citadelle
 - Des ennemis propres à chaque monde et 2 boss : le Grand Frelon et le Frelon Royal
 - 36 gouttes de rosée à trouver
-- Mode classique avec vies limitées, qualité graphique automatique (Réglages)
+- Carte du monde, médailles de temps (bronze, argent, or) par monde
+- Mode assistance (vitesse réduite, invincibilité, double saut), mode classique avec vies limitées, qualité graphique automatique
 - Tactile : joystick flottant, saut sur toute la moitié droite, bouton Élan
 - Clavier : flèches ou ZQSD, Espace pour sauter, X ou Maj pour l'Élan, Échap pour la pause
 
