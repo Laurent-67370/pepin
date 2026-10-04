@@ -11,7 +11,7 @@
    ```bash
    sudo curl -o /etc/systemd/system/pepin-scores.service https://raw.githubusercontent.com/Laurent-67370/pepin/main/server/pepin-scores.service
    sudo systemctl daemon-reload && sudo systemctl enable --now pepin-scores
-   curl http://127.0.0.1:3210/api/health
+   curl http://127.0.0.1:3215/api/health
    ```
 4. **nginx + HTTPS** :
    ```bash
