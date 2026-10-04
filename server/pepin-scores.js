@@ -19,10 +19,11 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 let db = { entries: {} }; // clé "device|level" -> { name, device, level, score, time, date }
 try { db = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) {}
 const PURGE_MS = 30 * 24 * 3600 * 1000; // au-delà de 30 jours
+// Seuls les défis du jour expirent : les records par monde restent acquis, même anciens
 function purgeOld(dry) {
   const cut = Date.now() - PURGE_MS;
   let n = 0;
-  for (const k of Object.keys(db.entries)) if (db.entries[k].date < cut) { if (!dry) delete db.entries[k]; n++; }
+  for (const k of Object.keys(db.entries)) if (db.entries[k].day && db.entries[k].date < cut) { if (!dry) delete db.entries[k]; n++; }
   return n;
 }
 purgeOld(); // au démarrage

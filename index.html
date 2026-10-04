@@ -2588,7 +2588,11 @@ document.getElementById('addProf').onclick = () => {
   save.profiles.push(p); save.current = p.id; persist(); inp.value = ''; msg.textContent = `${n} est prêt à jouer !`; SFX.power(); renderProfiles(); updateProfBtn(); updateTitleHS();
 };
 document.getElementById('newProf').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addProf').click(); } });
-const todayStr = () => new Date().toISOString().slice(0, 10);
+/* Jour du défi à l'heure de Paris : il change à minuit en France, été comme hiver, pour tous les joueurs */
+const parisDay = t => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(t); } catch (e) { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } };
+const todayStr = () => parisDay(new Date());
+/* Ménage : on ne garde que les 30 derniers défis du jour de chaque profil */
+{ const lim = parisDay(new Date(Date.now() - 30 * 864e5)); let n = 0; for (const p of save.profiles) for (const d of Object.keys(p.daily)) if (d < lim) { delete p.daily[d]; n++; } if (n) persist(); }
 function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % LEVELS.length; }
 let dailyRun = null;
 function updateDailyBtn() { document.getElementById('dailyBtn').textContent = `Défi du jour : ${LEVELS[dailyWorld(todayStr())].name}`; }
@@ -2823,7 +2827,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
