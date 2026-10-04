@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#1d1420">
 <title>Pépin, la graine voyageuse</title>
+<meta name="description" content="Jeu de plateforme original : 12 mondes, 2 boss, jouable au doigt, au clavier ou à la manette.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pépin">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
@@ -174,7 +182,9 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn primary" data-act="play">Jouer</button>
         <button class="btn" data-act="levels">Choisir un monde</button>
         <button class="btn" data-act="settings">Réglages</button>
+        <button class="btn" data-act="install" id="btnInstall" hidden>Installer le jeu sur cet appareil</button>
       </div>
+      <p class="hint" id="hintIOS" hidden>Pour l'installer sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ».</p>
       <p class="hint" id="hintTouch">Pouce gauche : bouger. Glisse vers le bas puis saute pour traverser une branche.<br>Pouce droit : touche n'importe où pour sauter, Élan pour foncer.</p>
       <p class="hint" id="hintKeys">Flèches ou ZQSD pour bouger, Espace pour sauter, X ou Maj pour l'élan, Échap pour la pause. Manette compatible.</p>
     </section>
@@ -203,6 +213,7 @@ body.has-touch.playing #touch{display:block;}
       <label class="set">Effets sonores<input type="checkbox" id="sSfx"></label>
       <label class="set"><span>Mode classique<small style="display:block;font-size:13px;color:var(--muted)">3 vies par monde, Game Over possible. Pris en compte au prochain monde.</small></span><input type="checkbox" id="sClassic"></label>
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
+      <p class="hint" id="appVersion"></p>
     </section>
 
     <section id="pPause" class="panel">
@@ -212,7 +223,7 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="restart">Recommencer le monde</button>
         <button class="btn" data-act="settings">Réglages</button>
-        <button class="btn" data-act="fullscreen">Plein écran</button>
+        <button class="btn" data-act="fullscreen" id="btnFs">Plein écran</button>
         <button class="btn" data-act="menu">Retour au menu</button>
       </div>
     </section>
@@ -552,24 +563,27 @@ const UMB = hcan(48, 18);
 })();
 
 /* ---------- Ennemis ---------- */
-function makeBeetle(f) {
+function makeBeetle(f, P2) {
+  P2 = P2 || BEETLE_PALS.beetle;
   const c = hcan(32, 32), g = c.getContext('2d');
-  [[8, 0], [14, 1], [20, 2]].forEach(([x, i]) => { const ph = (f + i) & 3, dx = [-1, 0, 1, 0][ph], lift = ph === 1 ? 1 : 0; g.fillStyle = '#1e1430'; g.fillRect(x, 26, 2, 2); g.fillRect(x + dx, 28 - lift, 2, 3); g.fillRect(x + dx * 2 - 1, 30 - lift, 3, 1); });
-  shadeBlob(g, 15, 21, 12.5, 9.5, ['#1e1430', '#2f2260', '#4b3592', '#6a4fc4', '#8f74e8', '#cbbcff'], { flatBottom: 0.6, over: (x, y, dx, dy) => Math.abs(x + 0.5 - 15) < 0.9 && dy < 0.5 ? '#2a1d58' : null });
+  [[8, 0], [14, 1], [20, 2]].forEach(([x, i]) => { const ph = (f + i) & 3, dx = [-1, 0, 1, 0][ph], lift = ph === 1 ? 1 : 0; g.fillStyle = P2.shell[0]; g.fillRect(x, 26, 2, 2); g.fillRect(x + dx, 28 - lift, 2, 3); g.fillRect(x + dx * 2 - 1, 30 - lift, 3, 1); });
+  shadeBlob(g, 15, 21, 12.5, 9.5, P2.shell, { flatBottom: 0.6, over: (x, y, dx, dy) => Math.abs(x + 0.5 - 15) < 0.9 && dy < 0.5 ? P2.seam : null });
+  if (P2.glow) { g.fillStyle = P2.glow; for (const [gx, gy] of [[9, 20], [12, 17], [19, 21], [21, 17]]) g.fillRect(gx, gy, 2, 1); }
   g.fillStyle = '#ffffff'; g.fillRect(8, 14, 3, 1); g.fillRect(7, 15, 1, 2); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(19, 15, 2, 1);
-  g.fillStyle = '#1e1430'; g.fillRect(3, 26, 24, 2); g.fillStyle = '#3a2a6a'; g.fillRect(4, 26, 22, 1);
-  shadeBlob(g, 27, 23, 4.5, 4.2, ['#1e1430', '#241a3a', '#2e2448', '#3d3260', '#5a4e86', '#7a6eaa']);
+  g.fillStyle = P2.shell[0]; g.fillRect(3, 26, 24, 2); g.fillStyle = P2.shell[1]; g.fillRect(4, 26, 22, 1);
+  shadeBlob(g, 27, 23, 4.5, 4.2, P2.head);
   g.fillStyle = '#ffffff'; g.fillRect(27, 21, 2, 2); g.fillStyle = '#1e1430'; g.fillRect(28, 22, 1, 1);
   const b = f & 1; g.fillStyle = '#1e1430'; g.fillRect(27, 17 + b, 1, 3); g.fillRect(28, 16 + b, 2, 1); g.fillRect(30, 15 + b, 1, 1); g.fillRect(25, 17, 1, 3); g.fillRect(24, 16, 1, 1);
   return c;
 }
-function makeBogue(f) {
+function makeBogue(f, B2) {
+  B2 = B2 || BOGUE_PALS.bogue;
   const c = hcan(32, 32), g = c.getContext('2d'), cx = 16, cy = 17, R = 8, rot = f * (Math.PI / 6) / 8;
   for (let k = 0; k < 12; k++) {
     const a = rot + k * Math.PI / 6;
-    for (let r = R - 2; r <= R + 4.5; r += 0.5) { const x = Math.round(cx - 0.5 + Math.cos(a) * r), y = Math.round(cy - 0.5 + Math.sin(a) * r); g.fillStyle = r > R + 3 ? '#f2f7b0' : r > R + 1 ? '#c9d36a' : '#56701c'; g.fillRect(x, y, r < R + 1.5 ? 2 : 1, r < R + 1.5 ? 2 : 1); }
+    for (let r = R - 2; r <= R + 4.5; r += 0.5) { const x = Math.round(cx - 0.5 + Math.cos(a) * r), y = Math.round(cy - 0.5 + Math.sin(a) * r); g.fillStyle = r > R + 3 ? B2.tip : r > R + 1 ? B2.mid : B2.base; g.fillRect(x, y, r < R + 1.5 ? 2 : 1, r < R + 1.5 ? 2 : 1); }
   }
-  shadeBlob(g, cx, cy, R, R, ['#26360c', '#3e5a14', '#56701c', '#7d9a2c', '#a3c24a', '#d6ec80']);
+  shadeBlob(g, cx, cy, R, R, B2.body);
   g.fillStyle = '#ffffff'; g.fillRect(12, 15, 3, 3); g.fillRect(18, 15, 3, 3);
   g.fillStyle = '#26360c'; g.fillRect(13, 16, 2, 2); g.fillRect(19, 16, 2, 2);
   g.fillRect(11, 13, 2, 1); g.fillRect(13, 14, 2, 1); g.fillRect(19, 14, 2, 1); g.fillRect(21, 13, 2, 1);
@@ -599,7 +613,102 @@ function makeFish(f) {
   g.fillStyle = '#123a50'; g.fillRect(3, 9, 2, 1);
   return c;
 }
-for (let f = 0; f < 4; f++) SPR['beetle' + f] = makeBeetle(f);
+
+const BEETLE_PALS = {
+  beetle: { shell: ['#1e1430', '#2f2260', '#4b3592', '#6a4fc4', '#8f74e8', '#cbbcff'], seam: '#2a1d58', head: ['#1e1430', '#241a3a', '#2e2448', '#3d3260', '#5a4e86', '#7a6eaa'] },
+  beetle_crystal: { shell: ['#0f2a40', '#1f5a80', '#2f8fbf', '#5fd0ec', '#a8f0ff', '#ffffff'], seam: '#1f5a80', head: ['#0f2a40', '#1a3050', '#22405f', '#2f5578', '#456f94', '#6a90b4'] },
+  beetle_magma: { shell: ['#140606', '#2a0e0a', '#3a1610', '#4f2016', '#6a2e20', '#8a4430'], seam: '#ff6a1a', head: ['#140606', '#1e0a08', '#2a100c', '#3a1610', '#4f2016', '#6a2e20'], glow: '#ffb03a' },
+  beetle_sky: { shell: ['#2a4a6a', '#5f86b0', '#8fb4dc', '#bcd8f2', '#e2f0ff', '#ffffff'], seam: '#8fb4dc', head: ['#2a4a6a', '#3d5f84', '#4f7298', '#6488ae', '#7fa2c6', '#a0c0e0'] },
+  beetle_steel: { shell: ['#14141e', '#2a2a3a', '#40405a', '#5c5c7a', '#8a8aa8', '#d0d0e8'], seam: '#2a2a3a', head: ['#14141e', '#1e1e2a', '#2a2a3a', '#3a3a50', '#505070', '#6a6a8a'] }
+};
+const BOGUE_PALS = {
+  bogue: { body: ['#26360c', '#3e5a14', '#56701c', '#7d9a2c', '#a3c24a', '#d6ec80'], base: '#56701c', mid: '#c9d36a', tip: '#f2f7b0' },
+  bogue_ice: { body: ['#1f3a5a', '#3a6a94', '#5a94c0', '#8cc0e6', '#c0e4ff', '#ffffff'], base: '#5a94c0', mid: '#c0e4ff', tip: '#ffffff' },
+  bogue_cactus: { body: ['#1f3a1a', '#2f5a24', '#3f7a30', '#5a9a40', '#7fbf5a', '#b0e08a'], base: '#3f7a30', mid: '#e8dcb0', tip: '#ffffff' },
+  bogue_crystal: { body: ['#2a1450', '#4a2a8a', '#6a40b8', '#9060e0', '#c098ff', '#f0e0ff'], base: '#6a40b8', mid: '#c098ff', tip: '#ffffff' },
+  bogue_lava: { body: ['#140606', '#2a1210', '#3a1a16', '#4f2620', '#6a3a30', '#8a5040'], base: '#a8320a', mid: '#ff7a1a', tip: '#ffe08a' },
+  bogue_storm: { body: ['#3a4256', '#5a6278', '#767e94', '#959db2', '#b8c0d2', '#e0e6f0'], base: '#767e94', mid: '#ffd34d', tip: '#fff6c8' },
+  bogue_bramble: { body: ['#2a0f24', '#4a1a3e', '#6a2a5a', '#8a3a78', '#b0589a', '#d888c0'], base: '#4a1a3e', mid: '#c06090', tip: '#ffc0e0' }
+};
+function makeScorpion(f) {
+  const c = hcan(32, 32), g = c.getContext('2d'), pal = ['#3a2410', '#7a4a1c', '#a8692c', '#c98f4e', '#e6b574', '#fbe0b0'];
+  [[10, 0], [15, 1], [20, 2]].forEach(([x, i]) => { const ph = (f + i) & 3, dx = [-1, 0, 1, 0][ph]; g.fillStyle = '#3a2410'; g.fillRect(x, 27, 1, 2); g.fillRect(x + dx, 29, 1, 2); g.fillRect(x + dx - 1, 30, 2, 1); });
+  const sw = (f & 2) ? 1 : 0;
+  [[7, 22], [5, 18], [5, 14], [7, 11], [10, 9 + sw], [13, 9 + sw]].forEach(([x, y], i) => shadeBlob(g, x + (i > 2 ? sw : 0), y, 2.8 - i * 0.12, 2.6 - i * 0.12, pal));
+  g.fillStyle = '#3a2410'; g.fillRect(15 + sw, 9 + sw, 3, 2); g.fillStyle = '#a32a35'; g.fillRect(17 + sw, 10 + sw, 2, 2); g.fillRect(19 + sw, 11 + sw, 1, 1);
+  shadeBlob(g, 15, 24, 9.5, 4.8, pal, { over: (x) => (x % 4 === 0 && x < 22) ? '#8a5424' : null });
+  shadeBlob(g, 24, 24, 3.6, 3.2, pal);
+  shadeBlob(g, 28, 21 - sw, 3.2, 2.4, pal); g.fillStyle = 'rgba(0,0,0,0)'; g.clearRect(29, 21 - sw, 2, 1);
+  g.fillStyle = '#ffffff'; g.fillRect(24, 22, 1, 1); g.fillRect(26, 22, 1, 1); g.fillStyle = '#1a0e08'; g.fillRect(24, 23, 1, 1); g.fillRect(26, 23, 1, 1);
+  return c;
+}
+function makePenguin(f) {
+  const c = hcan(32, 32), g = c.getContext('2d');
+  g.fillStyle = '#c96a1a'; const fy = 30; g.fillRect(f ? 11 : 12, fy, 5, 2); g.fillRect(f ? 18 : 17, fy, 5, 2);
+  shadeBlob(g, 16, 20.5, 8.5, 10, ['#0e1422', '#1c2638', '#28344c', '#36445f', '#4f5f80', '#7a8aa8'], { over: (x, y) => { const bx = (x + 0.5 - 18) / 5.6, by = (y + 0.5 - 23) / 7; return bx * bx + by * by <= 1 ? (by > 0.5 ? '#d8e4f2' : '#f8fbff') : null; } });
+  g.fillStyle = '#28344c'; g.fillRect(8, 19 + f, 2, 6);
+  g.fillStyle = '#ffffff'; g.fillRect(18, 14, 3, 3); g.fillRect(22, 14, 2, 3); g.fillStyle = '#0e1422'; g.fillRect(19, 15, 2, 2); g.fillRect(23, 15, 1, 2);
+  g.fillStyle = '#f0a020'; g.fillRect(23, 17, 4, 2); g.fillStyle = '#c96a1a'; g.fillRect(23, 18, 3, 1);
+  g.fillStyle = 'rgba(243,120,110,.7)'; g.fillRect(17, 18, 2, 1);
+  return c;
+}
+function makeFrog(f) {
+  const c = hcan(32, 32), g = c.getContext('2d'), pal = ['#1f4a1a', '#2f6a24', '#3f8a33', '#5fae3e', '#8fd06a', '#c8f59a'];
+  if (f) { g.fillStyle = '#1f4a1a'; g.fillRect(6, 25, 4, 6); g.fillRect(22, 25, 4, 6); g.fillStyle = '#3f8a33'; g.fillRect(7, 26, 2, 5); g.fillRect(23, 26, 2, 5); }
+  else { shadeBlob(g, 8, 27, 4.5, 3, pal); shadeBlob(g, 24, 27, 4.5, 3, pal); }
+  shadeBlob(g, 16, 22 + (f ? -2 : 0), 10, 6.5, pal, { over: (x, y, dx, dy) => dy > 0.35 ? '#e8f0b0' : null });
+  for (const ex of [11, 21]) { shadeBlob(g, ex, 15 + (f ? -2 : 0), 3.3, 3.3, pal); g.fillStyle = '#ffffff'; g.fillRect(ex - 1, 14 + (f ? -2 : 0), 3, 2); g.fillStyle = '#1a0e08'; g.fillRect(ex, 14 + (f ? -2 : 0), 2, 2); }
+  g.fillStyle = '#1f4a1a'; g.fillRect(12, 23 + (f ? -2 : 0), 8, 1); g.fillRect(11, 22 + (f ? -2 : 0), 1, 1); g.fillRect(20, 22 + (f ? -2 : 0), 1, 1);
+  g.fillStyle = 'rgba(243,120,110,.6)'; g.fillRect(8, 21 + (f ? -2 : 0), 2, 1); g.fillRect(23, 21 + (f ? -2 : 0), 2, 1);
+  return c;
+}
+function makeFlyer(kind, f) {
+  const c = hcan(32, 24), g = c.getContext('2d');
+  const wp = ['rgba(90,130,170,.85)', 'rgba(190,225,250,.5)', 'rgba(205,233,252,.55)', 'rgba(220,242,255,.62)', 'rgba(238,250,255,.72)', 'rgba(255,255,255,.85)'];
+  if (kind === 'bat') {
+    const wpal = ['#120a20', '#2a1648', '#3a2060', '#4f2c7a', '#6a3e9a', '#8a5ab8'];
+    const scal = (x, y, dx, dy) => dy > 0.2 && ((x >> 1) % 2 === 0) ? 'rgba(0,0,0,0)' : null;
+    if (f) { shadeBlob(g, 8, 8, 8, 4.5, wpal, { over: scal }); shadeBlob(g, 24, 8, 8, 4.5, wpal, { over: scal }); }
+    else { shadeBlob(g, 9, 15, 7, 5, wpal, { over: scal }); shadeBlob(g, 23, 15, 7, 5, wpal, { over: scal }); }
+    shadeBlob(g, 16, 12, 5, 5.2, ['#120a20', '#2a1648', '#3a2060', '#5a3488', '#7a50a8', '#a080d0']);
+    g.fillStyle = '#3a2060'; g.fillRect(12, 5, 2, 3); g.fillRect(18, 5, 2, 3);
+    g.fillStyle = '#ffffff'; g.fillRect(13, 10, 2, 2); g.fillRect(17, 10, 2, 2); g.fillStyle = '#e0484d'; g.fillRect(14, 11, 1, 1); g.fillRect(17, 11, 1, 1);
+    g.fillStyle = '#ffffff'; g.fillRect(14, 15, 1, 2); g.fillRect(17, 15, 1, 2);
+  } else if (kind === 'bird') {
+    g.fillStyle = '#4a7ab0'; g.fillRect(3, 12, 5, 2); g.fillRect(2, 11, 3, 1);
+    shadeBlob(g, 13, 14, 8, 5.2, ['#2a4a6a', '#6a9ac8', '#9cc4ea', '#ffffff', '#ffffff', '#ffffff'], { over: (x, y, dx, dy) => dy < -0.2 ? '#8ab8e6' : null });
+    shadeBlob(g, 22, 10, 4.5, 4.2, ['#2a4a6a', '#5a8ac0', '#7aa8d8', '#9cc4ea', '#c4dcf4', '#ffffff']);
+    g.fillStyle = '#ffcf3a'; g.fillRect(26, 10, 4, 2); g.fillStyle = '#c98a1c'; g.fillRect(26, 11, 3, 1);
+    g.fillStyle = '#1a0e08'; g.fillRect(23, 8, 2, 2); g.fillStyle = '#ffffff'; g.fillRect(23, 8, 1, 1);
+    if (f) shadeBlob(g, 12, 6, 7, 3.5, ['#2a4a6a', '#5a8ac0', '#7aa8d8', '#9cc4ea', '#c4dcf4', '#ffffff']);
+    else shadeBlob(g, 12, 18, 7, 3, ['#2a4a6a', '#5a8ac0', '#7aa8d8', '#9cc4ea', '#c4dcf4', '#ffffff']);
+  } else if (kind === 'mosquito') {
+    g.fillStyle = '#3a3028'; for (const [x, d] of [[10, -2], [13, 0], [16, 2]]) { g.fillRect(x, 14, 1, 4); g.fillRect(x + d, 18, 1, 4); }
+    shadeBlob(g, 12, 12, 7.5, 2.8, ['#2a2018', '#4a3a2a', '#5f4c38', '#7a6450', '#9a8470', '#c0ac98'], { over: (x) => x % 3 === 0 && x < 17 ? '#3a3028' : null });
+    shadeBlob(g, 21, 11, 3, 3, ['#2a2018', '#3a3028', '#4a3a2a', '#5f4c38', '#7a6450', '#9a8470']);
+    g.fillStyle = '#e0484d'; g.fillRect(21, 10, 2, 2); g.fillStyle = '#3a3028'; g.fillRect(24, 12, 6, 1);
+    if (f) { shadeBlob(g, 10, 5, 5, 2.5, wp); shadeBlob(g, 15, 4.5, 5, 2.5, wp); } else { shadeBlob(g, 9, 8, 5.5, 1.8, wp); shadeBlob(g, 15, 8, 5.5, 1.8, wp); }
+  } else if (kind === 'moth') {
+    const mp = ['#5a1e08', '#a83a10', '#d85a1a', '#ff8a2a', '#ffb050', '#ffe08a'];
+    const spot = (cx, cy) => (x, y) => { const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); return d < 1.3 ? '#1a0806' : d < 2.4 ? '#ffe08a' : null; };
+    if (f) { shadeBlob(g, 9, 6, 7, 5, mp, { over: spot(8, 6) }); shadeBlob(g, 21, 6, 7, 5, mp, { over: spot(22, 6) }); }
+    else { shadeBlob(g, 8, 13, 7, 4, mp, { over: spot(8, 13) }); shadeBlob(g, 22, 13, 7, 4, mp, { over: spot(22, 13) }); }
+    shadeBlob(g, 15, 12, 4, 6, ['#3a1606', '#6a2a0a', '#8a3a10', '#b85a20', '#d88040', '#f0b070']);
+    g.fillStyle = '#3a1606'; g.fillRect(13, 3, 1, 4); g.fillRect(17, 3, 1, 4); g.fillRect(12, 2, 2, 1); g.fillRect(17, 2, 2, 1);
+    g.fillStyle = '#ffffff'; g.fillRect(14, 8, 1, 1); g.fillRect(16, 8, 1, 1);
+  }
+  return c;
+}
+const SKINS = {
+  frost: { b: 'penguin', x: 'bogue_ice' }, dunes: { b: 'scorpion', x: 'bogue_cactus' },
+  crystal: { b: 'beetle_crystal', x: 'bogue_crystal', w: 'bat' }, marsh: { b: 'frog', w: 'mosquito' },
+  volcano: { b: 'beetle_magma', x: 'bogue_lava', w: 'moth' }, sky: { b: 'beetle_sky', x: 'bogue_storm', w: 'bird' },
+  castle: { b: 'beetle_steel', x: 'bogue_bramble', w: 'bat' }
+};
+for (const k in BEETLE_PALS) for (let f = 0; f < 4; f++) SPR[k + f] = makeBeetle(f, BEETLE_PALS[k]);
+for (const k in BOGUE_PALS) if (k !== 'bogue') for (let f = 0; f < 8; f++) SPR[k + f] = makeBogue(f, BOGUE_PALS[k]);
+for (let f = 0; f < 4; f++) SPR['scorpion' + f] = makeScorpion(f);
+for (let f = 0; f < 2; f++) { SPR['penguin' + f] = makePenguin(f); SPR['frog' + f] = makeFrog(f); for (const k of ['bat', 'bird', 'mosquito', 'moth']) SPR[k + f] = makeFlyer(k, f); }
 for (let f = 0; f < 8; f++) SPR['bogue' + f] = makeBogue(f);
 SPR.wasp1 = makeWasp(1); SPR.wasp2 = makeWasp(0);
 SPR.fish1 = makeFish(0); SPR.fish2 = makeFish(1);
@@ -793,7 +902,7 @@ const LEVELS = [
       b.fill(55, 63, 2, 8, '#'); b.row(56, 10, 'ooo'); b.put(60, 11, 'x'); b.row(61, 10, 'oo');
       b.put(67, 11, 'K');
       b.fill(72, 72, 9, 11, 'C'); b.line(72, 77, 8, '='); b.fill(77, 77, 9, 11, '='); b.put(75, 11, '*'); b.put(73, 11, 'o');
-      b.line(80, 81, 10, '-'); b.line(83, 84, 8, '-'); b.line(86, 95, 6, '-'); b.row(87, 5, 'oooooo'); b.put(92, 5, 'b');
+      b.line(80, 81, 10, '-'); b.line(83, 84, 8, '-'); b.line(86, 95, 6, '-'); b.row(87, 5, 'oooooo'); b.put(94, 5, 'b');
       b.line(96, 104, 14, '~'); b.put(98, 10, 'M');
       b.ground(105, 118, 12); b.put(108, 11, 'H'); b.line(111, 113, 10, '='); b.put(112, 9, 'L');
       b.line(119, 131, 14, '~'); b.line(124, 126, 10, '-'); b.row(120, 8, 'oo'); b.row(128, 8, 'oo');
@@ -928,7 +1037,7 @@ const LEVELS = [
       b.ground(86, 120, 12); b.put(88, 11, 'K'); b.line(91, 93, 10, '='); b.put(92, 9, 'L'); b.put(95, 6, 'w'); b.put(100, 11, 'b'); b.put(108, 11, 'b');
       b.fill(112, 112, 9, 11, 'C'); b.line(112, 117, 8, '='); b.fill(117, 117, 9, 11, '='); b.put(115, 11, '*'); b.put(113, 11, 'o');
       lava(121, 150); b.line(123, 124, 11, 'c'); b.line(127, 128, 9, 'c'); b.line(131, 132, 11, 'c'); b.put(136, 10, 'M'); b.line(143, 144, 10, 'c'); b.line(147, 148, 11, 'c');
-      b.put(125, 13, 'f'); b.put(130, 13, 'f'); b.put(140, 13, 'f'); b.put(146, 13, 'f'); b.put(128, 5, '*'); b.row(123, 9, 'oo  oo  oo'); b.row(143, 8, 'oo oo');
+      b.put(125, 13, 'f'); b.put(130, 13, 'f'); b.put(140, 13, 'f'); b.put(146, 13, 'f'); b.put(128, 5, '*'); b.row(123, 10, 'oo'); b.row(127, 8, 'oo'); b.row(131, 10, 'oo'); b.row(143, 8, 'oo oo');
       b.ground(151, 189, 12); b.put(153, 11, 'K'); b.line(160, 162, 11, '^'); b.row(159, 7, 'ooooo'); b.put(168, 11, 'x'); b.put(175, 11, 'b'); b.put(183, 11, 'G');
     } },
   { name: 'Le Royaume des nuages', sub: 'Monde 11', theme: 'sky', w: 200, song: 11, wind: { period: 400, dur: 120, dir: 1, force: 0.75, alt: true },
@@ -1005,6 +1114,12 @@ function loadLevel(i) {
   signs = (def.signs || []).map(([sx, txt]) => { let sy = 0; for (let y = 0; y < ROWS; y++) { if (isSolid(L.g[y][sx]) || L.g[y][sx] === '-') { sy = y; break; } } return { x: sx * T, y: sy * T - 14, txt }; });
   respawnPt = { x: P.x, y: P.y };
   Object.assign(P, { vx: 0, vy: 0, face: 1, onGround: false, coyote: 0, buffer: 0, jumping: false, dashT: 0, dashUsed: false, dashCD: 0, inv: 0, leaf: false, hearts: 3, anim: 0, dropT: 0, sx: 1, sy: 1, mover: null, hurtT: 0, gliding: false, blink: 0 });
+  for (const e of enemies) {
+    const sk = SKINS[TH.id] || {};
+    e.skin = sk[e.type] || (e.type === 'b' ? 'beetle' : e.type === 'x' ? 'bogue' : e.type === 'w' ? 'wasp' : '');
+    if (e.skin === 'penguin') e.vx = -0.7; else if (e.skin === 'scorpion') e.vx = -0.55; else if (e.skin === 'frog') { e.vx = 0; e.t = (e.x * 3) % 90; }
+    if (e.type === 'w') { e.hx = e.x0; e.hy = e.y0; e.st = 'idle'; e.cd = 0; }
+  }
   stats = { seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: !!save.settings.classic, lives: 3, nextLife: 25 };
   cam.x = clamp(P.x - VW / 2, 0, L.w * T - VW); cam.y = clamp(P.y - VH * 0.55, minCamY(), maxCamY());
   crumbles = new Map(); irisT = 34; wind.active = wind.warn = false;
@@ -1461,11 +1576,34 @@ function updateEnemies() {
       if (TH.lava && globalT % 3 === 0) particles.push({ x: e.x + 6, y: e.y + 4, vx: (Math.random() - 0.5) * 0.5, vy: 0.3, life: 18, max: 18, c: Math.random() < 0.5 ? '#ffd34d' : '#ff6a1a', s: 2, g: 0, glow: true });
       if (e.vy > 0 && e.y >= e.y0) { e.y = e.y0; e.st = 'under'; e.t = 0; splash(e); continue; }
     } else if (e.type === 'w') {
-      const ox = e.x; e.x = e.x0 + Math.sin(e.t * 0.022) * 30; e.y = e.y0 + Math.sin(e.t * 0.07) * 7; e.vx = e.x - ox;
+      const ox = e.x;
+      if (e.skin === 'bat') {
+        if (e.cd > 0) e.cd--;
+        if (e.st === 'idle') {
+          e.x = e.hx + Math.sin(e.t * 0.03) * 6; e.y = e.hy + Math.sin(e.t * 0.08) * 3;
+          if (!e.cd && state === 'play' && Math.abs(P.x + P.w / 2 - (e.x + e.w / 2)) < 70 && P.y > e.y + 8) { e.st = 'swoop'; e.tx = P.x + P.w / 2 - e.w / 2; e.ty = P.y; e.k = 0; AU.tone(1400, 0.12, 'square', 0.03, 700); }
+        } else if (e.st === 'swoop') {
+          e.k++; const dx = e.tx - e.x, dy = e.ty - e.y, d = Math.hypot(dx, dy) || 1, sp = 2.3;
+          e.x += dx / d * sp; e.y += dy / d * sp;
+          if (d < 4 || e.k > 70 || isSolid(tileAt(Math.floor((e.x + 6) / T), Math.floor((e.y + e.h) / T)))) { e.st = 'back'; }
+        } else {
+          const dx = e.hx - e.x, dy = e.hy - e.y, d = Math.hypot(dx, dy) || 1;
+          e.x += dx / d * 1.2; e.y += dy / d * 1.2; if (d < 2) { e.st = 'idle'; e.cd = 80; }
+        }
+      } else if (e.skin === 'bird') { e.x = e.x0 + Math.sin(e.t * 0.012) * 80; e.y = e.y0 + Math.sin(e.t * 0.05) * 6; }
+      else if (e.skin === 'mosquito') { e.x = e.x0 + Math.sin(e.t * 0.04) * 26; e.y = e.y0 + Math.sin(e.t * 0.13) * 10; }
+      else if (e.skin === 'moth') { e.x = e.x0 + Math.sin(e.t * 0.016) * 34; e.y = e.y0 + Math.sin(e.t * 0.032) * 14; if (globalT % 6 === 0) particles.push({ x: e.x + 6, y: e.y + 6, vx: (Math.random() - 0.5) * 0.4, vy: 0.2, life: 20, max: 20, c: '#ffb050', s: 1, g: 0, glow: true }); }
+      else { e.x = e.x0 + Math.sin(e.t * 0.022) * 30; e.y = e.y0 + Math.sin(e.t * 0.07) * 7; }
+      e.vx = e.x - ox;
     } else {
       e.vy = Math.min(e.vy + GRAV, 6);
+      if (e.skin === 'frog') {
+        if (e.grounded && e.t % 100 === 99) { const dir = Math.abs(P.x - e.x) < 140 ? Math.sign(P.x - e.x) || 1 : (Math.random() < 0.5 ? -1 : 1); const ahead = tileAt(Math.floor((e.x + e.w / 2 + dir * 30) / T), Math.floor((e.y + e.h + 2) / T)); if (isSolid(ahead) || ahead === '-') { e.vy = -5.2; e.vx = dir * 1.3; e.grounded = false; } }
+      } else if (e.skin === 'penguin') { const ice = tileAt(Math.floor((e.x + e.w / 2) / T), Math.floor((e.y + e.h + 1) / T)) === '_'; e.vx = Math.sign(e.vx || -1) * (ice ? 1.15 : 0.7); }
       const r = moveBody(e, false, false);
-      if (r.hitX) e.vx *= -1;
+      if (e.skin === 'frog') { if (r.landed) { if (!e.grounded) e.vx = 0; e.grounded = true; } if (r.hitX) e.vx = 0; }
+      if (e.skin === 'frog') { /* les grenouilles gèrent seules leurs sauts */ }
+      else if (r.hitX) e.vx *= -1;
       else if (r.landed) {
         const fx = e.vx > 0 ? e.x + e.w + 1 : e.x - 1; const c = tileAt(Math.floor(fx / T), Math.floor((e.y + e.h + 2) / T));
         if (!(isSolid(c) || c === '-')) e.vx *= -1;
@@ -1991,7 +2129,12 @@ function drawEnemies() {
       continue;
     }
     const face = e.type === 'w' ? (e.vx >= 0 ? 1 : -1) : (e.vx > 0 ? 1 : -1);
-    const name = e.type === 'b' ? 'beetle' + ((e.t >> 3) & 3) : e.type === 'x' ? 'bogue' + (((face > 0 ? e.t : -e.t) >> 2) & 7) : ((e.t >> 1) & 1 ? 'wasp1' : 'wasp2');
+    let name;
+    if (e.type === 'x') name = e.skin + (((face > 0 ? e.t : -e.t) >> 2) & 7);
+    else if (e.type === 'w') name = e.skin === 'wasp' ? ((e.t >> 1) & 1 ? 'wasp1' : 'wasp2') : e.skin + ((e.t >> (e.skin === 'bird' || e.skin === 'moth' ? 3 : e.skin === 'bat' ? 2 : 1)) & 1);
+    else if (e.skin === 'frog') name = 'frog' + (e.grounded === false ? 1 : 0);
+    else if (e.skin === 'penguin') name = 'penguin' + ((e.t >> 3) & 1);
+    else name = e.skin + ((e.t >> 3) & 3);
     const img = sprite(name, face);
     const cx = Math.round(e.x + e.w / 2), by = Math.round(e.y + e.h);
     ctx.save(); ctx.translate(cx, by - 6);
@@ -2264,6 +2407,7 @@ function startLevel(i) {
   AU.init(); loadLevel(i); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
 }
 function goMenu() {
+  if (pendingReload) { location.reload(); return; }
   state = 'menu'; loadLevel(0); cam.x = 0; showPanel('title'); panelStack = ['title']; playSong(3);
 }
 function openPause() {
@@ -2322,14 +2466,34 @@ overlay.addEventListener('click', e => {
   else if (a === 'restart') startLevel(levelIdx);
   else if (a === 'menu') goMenu();
   else if (a === 'fullscreen') toggleFullscreen();
+  else if (a === 'install') installApp();
 });
 pauseBtn.addEventListener('click', () => { AU.init(); openPause(); });
 pauseBtn.addEventListener('pointerdown', e => e.stopPropagation());
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') openPause(); });
 
+
+/* =========================================================
+   Application installable (PWA) : hors ligne, plein écran natif
+   ========================================================= */
+const APP_VERSION = '1.1.0';
+const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let installEvt = null, pendingReload = false;
+if (standalone) document.getElementById('btnFs').hidden = true;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; document.getElementById('btnInstall').hidden = false; });
+addEventListener('appinstalled', () => { installEvt = null; document.getElementById('btnInstall').hidden = true; });
+function installApp() { if (!installEvt) return; installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; document.getElementById('btnInstall').hidden = true; }); }
+if (!standalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) document.getElementById('hintIOS').hidden = false;
+if ('serviceWorker' in navigator && location.protocol === 'https:' && /github\.io$|lhusser\.fr$/.test(location.hostname)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController) { hadController = true; return; } if (state === 'menu') location.reload(); else pendingReload = true; });
+}
+
 /* Réglages */
 const S = { quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
 function fillSettings() {
+  document.getElementById('appVersion').textContent = 'Version ' + APP_VERSION + (standalone ? ' · application installée' : '');
   for (const k in S) { const el = document.getElementById(S[k]); if (el.type === 'checkbox') el.checked = !!save.settings[k]; else el.value = save.settings[k]; }
 }
 for (const k in S) {
