@@ -196,6 +196,7 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn primary" data-act="play">Jouer</button>
         <button class="btn" data-act="levels">Carte du monde</button>
         <button class="btn" data-act="settings">Réglages</button>
+        <button class="btn" data-act="quit">Quitter le jeu</button>
         <button class="btn" data-act="install" id="btnInstall" hidden>Installer le jeu sur cet appareil</button>
       </div>
       <p class="hint" id="hintIOS" hidden>Pour l'installer sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ».</p>
@@ -244,7 +245,14 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="fullscreen" id="btnFs">Plein écran</button>
         <button class="btn" data-act="menu">Retour au menu</button>
+        <button class="btn" data-act="quit">Quitter le jeu</button>
       </div>
+    </section>
+
+    <section id="pBye" class="panel">
+      <h2>À bientôt !</h2>
+      <p class="sub">Ta progression est enregistrée. Tu peux fermer cet onglet ou l'application.</p>
+      <div class="stack"><button class="btn primary" data-act="menu">Rejouer</button></div>
     </section>
 
     <section id="pResults" class="panel">
@@ -2401,7 +2409,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', layout);
    Menus et écrans
    ========================================================= */
 const overlay = document.getElementById('overlay');
-const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults' };
+const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye' };
 let panelStack = [];
 function showPanel(name, push = true) {
   releaseAllTouch();
@@ -2555,6 +2563,7 @@ overlay.addEventListener('click', e => {
   else if (a === 'resume') resumeGame();
   else if (a === 'restart') startLevel(levelIdx);
   else if (a === 'menu') goMenu();
+  else if (a === 'quit') quitGame();
   else if (a === 'fullscreen') toggleFullscreen();
   else if (a === 'install') installApp();
 });
@@ -2566,7 +2575,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -2578,6 +2587,26 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && /github\.i
   navigator.serviceWorker.register('sw.js').catch(() => {});
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController) { hadController = true; return; } if (state === 'menu') location.reload(); else pendingReload = true; });
+}
+
+/* Quitter le jeu, et bouton/geste Retour d'Android */
+function quitGame() {
+  persist(); stopSong(); releaseAllTouch();
+  state = 'menu'; loadLevel(0); cam.x = 0;
+  try { window.close(); } catch (e) {}
+  setTimeout(() => { if (!document.hidden) { panelStack = []; showPanel('bye'); } }, 250);
+}
+const backNav = location.protocol === 'https:' && !/claude/.test(location.hostname);
+function armBack() { if (backNav) try { history.pushState({ pepin: Date.now() }, ''); } catch (e) {} }
+if (backNav) {
+  armBack();
+  addEventListener('popstate', () => {
+    if (state === 'play') { openPause(); armBack(); }
+    else if (state === 'pause') { resumeGame(); armBack(); }
+    else if (state === 'results') { goMenu(); armBack(); }
+    else if (panelStack.length > 1) { back(); armBack(); }
+    else history.back();
+  });
 }
 
 /* Réglages */
