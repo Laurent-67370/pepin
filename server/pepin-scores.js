@@ -11,6 +11,8 @@ const LEVELS = 12;
 // Temps minimal plausible par monde (secondes), d'après le parcours optimal du robot vérificateur
 const MIN_TIME = [10, 10, 12, 11, 10, 15, 11, 10, 11, 11, 11, 18];
 const MAX_SCORE = 60000;
+function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % LEVELS; }
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NAME_RE = /^[\p{L}\p{N} _.'-]{2,12}$/u;
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -27,12 +29,17 @@ function limited(ip) {
   h.push(now); hits.set(ip, h); return h.length > 20;
 }
 function topLevel(level, n = 10) {
-  return Object.values(db.entries).filter(e => e.level === level).sort((a, b) => b.score - a.score || a.time - b.time).slice(0, n)
+  return Object.values(db.entries).filter(e => e.level === level && !e.day).sort((a, b) => b.score - a.score || a.time - b.time).slice(0, n)
+    .map((e, i) => ({ rank: i + 1, name: e.name, score: e.score, time: e.time, device: e.device.slice(0, 8) }));
+}
+function topDaily(day, n = 10) {
+  return Object.values(db.entries).filter(e => e.day === day).sort((a, b) => b.score - a.score || a.time - b.time).slice(0, n)
     .map((e, i) => ({ rank: i + 1, name: e.name, score: e.score, time: e.time, device: e.device.slice(0, 8) }));
 }
 function topTotal(n = 10) {
   const per = new Map();
   for (const e of Object.values(db.entries)) {
+    if (e.day) continue;
     const p = per.get(e.device) || { name: e.name, score: 0, worlds: 0, last: 0, device: e.device };
     p.score += e.score; p.worlds++; if (e.date > p.last) { p.last = e.date; p.name = e.name; }
     per.set(e.device, p);
@@ -51,6 +58,8 @@ http.createServer((req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, null, origin);
   if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, entries: Object.keys(db.entries).length }, origin);
   if (req.method === 'GET' && url.pathname === '/api/scores') {
+    const dq = url.searchParams.get('daily');
+    if (dq) { if (!DAY_RE.test(dq)) return send(res, 400, { error: 'jour invalide' }, origin); return send(res, 200, { day: dq, level: dailyWorld(dq), top: topDaily(dq) }, origin); }
     const lv = url.searchParams.get('level');
     if (lv === 'total') return send(res, 200, { level: 'total', top: topTotal() }, origin);
     const level = +lv; if (!Number.isInteger(level) || level < 0 || level >= LEVELS) return send(res, 400, { error: 'monde invalide' }, origin);
@@ -69,10 +78,16 @@ http.createServer((req, res) => {
       if (typeof time !== 'number' || time < MIN_TIME[level] || time > 3600) return send(res, 400, { error: 'temps invalide' }, origin);
       if (!NAME_RE.test(name)) return send(res, 400, { error: 'prénom invalide' }, origin);
       if (!/^[a-f0-9-]{16,40}$/i.test(device)) return send(res, 400, { error: 'appareil invalide' }, origin);
-      const key = device + '|' + level, prev = db.entries[key];
-      if (!prev || score > prev.score) { db.entries[key] = { name, device, level, score, time: Math.round(time * 10) / 10, date: Date.now() }; persist(); }
+      let day = null;
+      if (d.day != null) {
+        day = String(d.day);
+        if (!DAY_RE.test(day) || Math.abs(Date.parse(day + 'T12:00:00Z') - Date.now()) > 40 * 3600 * 1000) return send(res, 400, { error: 'jour invalide' }, origin);
+        if (dailyWorld(day) !== level) return send(res, 400, { error: 'monde du jour invalide' }, origin);
+      }
+      const key = device + '|' + (day ? 'D' + day : level), prev = db.entries[key];
+      if (!prev || score > prev.score) { db.entries[key] = { name, device, level, score, time: Math.round(time * 10) / 10, date: Date.now(), ...(day ? { day } : {}) }; persist(); }
       else if (prev.name !== name) { prev.name = name; persist(); }
-      const top = topLevel(level, 1000), rank = top.findIndex(e => e.device === device.slice(0, 8) && e.name === name) + 1;
+      const top = day ? topDaily(day, 1000) : topLevel(level, 1000), rank = top.findIndex(e => e.device === device.slice(0, 8) && e.name === name) + 1;
       return send(res, 200, { ok: true, best: (db.entries[key] || {}).score, rank, total: top.length }, origin);
     });
     return;
