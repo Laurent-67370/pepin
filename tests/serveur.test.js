@@ -18,7 +18,7 @@ function portLibre() {
 }
 async function demarrer(dossier) {
   const port = await portLibre();
-  const proc = spawn(process.execPath, [SERVEUR], { env: { ...process.env, PORT: String(port), DATA_DIR: dossier }, stdio: ['ignore', 'pipe', 'inherit'] });
+  const proc = spawn(process.execPath, [SERVEUR], { env: { ...process.env, PORT: String(port), DATA_DIR: dossier, GAME_HTML: path.join(__dirname, '..', 'index.html'), GAME_FETCH: '0' }, stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise((ok, ko) => { proc.stdout.on('data', d => { if (String(d).includes('Classement')) ok(); }); proc.on('exit', c => ko(new Error('serveur arrêté, code ' + c))); });
   return { port, proc, url: `http://127.0.0.1:${port}` };
 }
@@ -129,4 +129,53 @@ test('classement total : un appareil cumule ses mondes', async () => {
   await post(score({ device: dev, level: 5, score: 30000, name: 'Cumul' }));
   const t = (await get('/api/scores?level=total')).body.top.find(e => e.name === 'Cumul');
   assert.equal(t.score, 60000); assert.equal(t.worlds, 2);
+});
+
+/* Vérification des parties (mode observation) : le record est accepté tout de suite, puis la partie est rejouée */
+const { partieTerminee } = require('./aide-partie.js');
+const PARTIE = partieTerminee();
+async function verifDe(name, delai = 15000) {
+  const fin = Date.now() + delai;
+  while (Date.now() < fin) {
+    const v = (await get('/api/verifs')).body.recents.find(e => e.name === name);
+    if (v) return v;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error('vérification jamais arrivée pour ' + name);
+}
+const envoi = (name, device, o = {}) => post({ level: 0, score: PARTIE.score, time: PARTIE.time, name, device, replay: PARTIE.replay, ...o });
+
+test('vérification : partie honnête validée', async () => {
+  assert.equal((await envoi('Honnête', 'f0f0f0f0f0f0f0f0a001')).status, 200);
+  const v = await verifDe('Honnête');
+  assert.equal(v.r, 'ok', v.why); assert.ok(v.ms > 0);
+  const h = (await get('/api/health')).body; assert.ok(h.verifs.ok >= 1); assert.ok(h.jeux.includes(JSON.parse(PARTIE.replay).app));
+});
+
+test('vérification : score gonflé repéré mais accepté (mode observation)', async () => {
+  assert.equal((await envoi('Gonflé', 'f0f0f0f0f0f0f0f0a002', { score: PARTIE.score + 5000 })).status, 200);
+  const v = await verifDe('Gonflé');
+  assert.equal(v.r, 'ecart'); assert.match(v.why, /score/);
+  assert.ok((await get('/api/scores?level=0')).body.top.some(e => e.name === 'Gonflé'), 'refusé alors qu\'on ne fait qu\'observer');
+});
+
+test('vérification : partie absente ou d\'une version inconnue', async () => {
+  await envoi('Ancien', 'f0f0f0f0f0f0f0f0a003', { replay: undefined });
+  assert.equal((await verifDe('Ancien')).r, 'absent');
+  await envoi('Futur', 'f0f0f0f0f0f0f0f0a004', { replay: JSON.stringify({ ...JSON.parse(PARTIE.replay), app: '9.9.9' }) });
+  const v = await verifDe('Futur'); assert.equal(v.r, 'version'); assert.match(v.why, /9\.9\.9/);
+});
+
+test('vérification : résultat gardé avec le record, même après un redémarrage', async () => {
+  await arreter(srv); srv = await demarrer(dossier);
+  const db = JSON.parse(fs.readFileSync(path.join(dossier, 'scores.json'), 'utf8'));
+  const e = Object.values(db.entries).find(x => x.name === 'Honnête');
+  assert.deepEqual(e.check, { r: 'ok' });
+  assert.ok((await get('/api/health')).body.jeux.length >= 1, 'copie du jeu non conservée');
+});
+
+test('une partie trop volumineuse est refusée sans faire tomber le serveur', async () => {
+  const r = await post({ level: 0, score: 1, time: 20, name: 'Gros', device: 'f0f0f0f0f0f0f0f0a005', replay: 'x'.repeat(300 * 1024) }).catch(() => ({ status: 0 }));
+  assert.notEqual(r.status, 200);
+  assert.equal((await get('/api/health')).status, 200);
 });

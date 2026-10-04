@@ -22,10 +22,11 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 ## Vérifier
 - `node tools/verifier-niveaux.js [numéro de monde]` rejoue la physique du saut et signale toute arrivée, graine, goutte ou caisse inaccessible.
 - `node tools/verifier-coherence.js` contrôle que `APP_VERSION` (index.html) et `VERSION` (sw.js) correspondent, et que le jeu et le serveur tirent le même monde du jour.
-- `node --test tests/serveur.test.js` teste le serveur de classement (validation, défi du jour, anti-abus, sauvegarde, purge).
+- `node --test tests/serveur.test.js` teste le serveur de classement (validation, défi du jour, anti-abus, sauvegarde, purge, vérification des parties).
 - `node --test tests/determinisme.test.js` fait tourner le vrai jeu dans Node (`tools/moteur-headless.js`) et vérifie qu'une même graine et les mêmes entrées donnent exactement la même partie, quels que soient l'écran et l'aléatoire de l'affichage.
 - `node --test tests/rejeu.test.js` enregistre des parties, les rejoue sur un autre « appareil » et vérifie qu'elles retombent exactement sur le même état.
 - `node --test tests/fantome.test.js` vérifie la trajectoire du fantôme, son rythme, et qu'il n'influence jamais la partie.
+- `node --test tests/verif.test.js` vérifie que le serveur valide une partie honnête et repère score, temps, entrées, assistance ou graine du défi falsifiés.
 
 Ces vérifications tournent automatiquement sur GitHub Actions à chaque push.
 

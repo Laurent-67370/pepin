@@ -1280,12 +1280,12 @@ function startReplay(str, back) {
   document.getElementById('replayTag').hidden = false;
   return true;
 }
-function endReplay(finished) {
+function endReplay(finished, why) {
   const p = replay; if (!p) return;
   p.ok = finished ? stateHash() === p.r.fin : null;
   if (finished && !p.ok) console.warn('Pépin : rejeu désynchronisé (enregistré en ' + p.r.app + ')');
   replay = null; document.getElementById('replayTag').hidden = true; releaseAllTouch();
-  if (p.back) p.back(p.ok);
+  if (p.back) p.back(p.ok, why);
 }
 /* Meilleure partie (temps) par monde et par profil, stockée à part de la sauvegarde : elle servira au fantôme */
 function loadReplays() { try { return JSON.parse(localStorage.getItem(REPLAY_KEY) || '{}') || {}; } catch (e) { return {}; } }
@@ -1738,7 +1738,7 @@ function loseLife() {
   startRespawn();
 }
 function gameOver() {
-  if (replay) { endReplay(true); return; }
+  if (replay) { endReplay(true, 'gameover'); return; }
   state = 'gameover'; fadeT = 0; P.vx = P.vy = 0; P.dashT = 0; stopSong(); releaseAllTouch();
   if (AU.ctx) { const t = AU.ctx.currentTime; [523, 466, 415, 392].forEach((f, i) => AU.tone(f, 0.32, 'triangle', 0.13, null, t + 0.2 + i * 0.22)); }
 }
@@ -2787,10 +2787,17 @@ function renderScores() {
       : '<p class="hint">Personne n\'a encore enregistré de score ici. À toi de jouer !</p>';
   }).catch(() => { if (want === scoreLevel && scoreTab === 'online') box.innerHTML = '<p class="hint">Classement en ligne indisponible pour le moment (pas de réseau, ou serveur pas encore installé).</p>'; });
 }
+/* Partie envoyée au serveur, qui la rejoue pour vérifier le score : entrées seules, sans la trajectoire du fantôme */
+function replayForServer(str) { try { const o = JSON.parse(str); delete o.path; delete o.step; return JSON.stringify(o); } catch (e) { return undefined; } }
 function submitOnline(level, score, time, cb, day) {
   if (!save.settings.online || !save.playerName) { cb && cb(null); return; }
-  fetch(SCORE_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, score, time, name: save.playerName, device: save.deviceId, v: APP_VERSION, ...(day ? { day } : {}) }) })
-    .then(r => r.json()).then(d => cb && cb(d && d.ok ? d : null)).catch(() => cb && cb(null));
+  const base = { level, score, time, name: save.playerName, device: save.deviceId, v: APP_VERSION, ...(day ? { day } : {}) };
+  const replay = lastReplay ? replayForServer(lastReplay) : undefined;
+  const send = body => fetch(SCORE_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+  // Si l'envoi avec la partie échoue (serveur pas encore à jour, limite de taille), le score part seul
+  send(replay ? { ...base, replay } : base)
+    .then(d => d && d.ok ? d : replay ? send(base) : d, () => replay ? send(base) : null)
+    .then(d => cb && cb(d && d.ok ? d : null)).catch(() => cb && cb(null));
 }
 function hofQualifies(level, score) { const l = save.hof[level] || []; return score > 0 && (l.length < 5 || score > l[l.length - 1].score); }
 function hofInsert(level, entry) { const l = (save.hof[level] || []).concat(entry).sort((a, b) => b.score - a.score || a.time - b.time).slice(0, 5); save.hof[level] = l; return l.indexOf(entry) + 1; }
@@ -2836,17 +2843,23 @@ function goMenu() {
 }
 function openPause() {
   if (state !== 'play') return;
-  if (replay) { endReplay(false); return; } // Pause ou Échap pendant un rejeu : on revient d'où l'on vient
+  if (replay) { endReplay(false, 'pause'); return; } // Pause ou Échap pendant un rejeu : on revient d'où l'on vient
   state = 'pause'; stopSong(); releaseAllTouch();
   document.getElementById('pauseInfo').textContent = `${dailyRun ? 'Défi du jour · ' : ''}${L.def.sub} : ${L.def.name}. ${stats.seeds}/${stats.seedsTotal} graines, ${fmtTime(stats.time)}.`;
   panelStack = []; showPanel('pause');
 }
 function resumeGame() { syncRunSettings(); state = 'play'; hidePanels(); playSong(L.def.song); layoutTouch(); }
+/* Score de fin de monde : points en jeu et bonus. Aussi appelé par le serveur sur une partie rejouée. */
+function scoreBreakdown(i) {
+  const gemsN = stats.gems.filter(Boolean).length, secs = stats.time / 60, bTime = Math.max(0, Math.round(medalTimes(i)[2] - secs)) * 50;
+  const bHearts = P.hearts * 300, bNoFall = stats.deaths === 0 ? 1000 : 0, bSeeds = stats.seeds >= stats.seedsTotal ? 2000 : 0, bGems = gemsN === 3 ? 1000 : 0;
+  return { gemsN, bTime, bHearts, bNoFall, bSeeds, bGems, total: stats.score + bTime + bHearts + bNoFall + bSeeds + bGems };
+}
 function showResults() {
-  if (replay) { endReplay(true); return; }
+  if (replay) { endReplay(true, 'arrivee'); return; }
   state = 'results';
   const i = levelIdx, prev = save.best[i], keepBest = prev ? JSON.parse(JSON.stringify(prev)) : null, keepUnl = save.unlocked, counts = !dailyRun || i < save.unlocked;
-  const gemsN = stats.gems.filter(Boolean).length;
+  const { gemsN, bTime, bHearts, bNoFall, bSeeds, bGems, total } = scoreBreakdown(i);
   const isRecord = counts && (!prev || stats.time < prev.time) && !(assistOn() || stats.assistUsed);
   // Partie enregistrée : gardée pour « Revoir », et comme meilleure partie du monde si c'est le meilleur temps sans assistance
   const done = rec ? packReplay({ ...rec, time: stats.time }, stateHash()) : null; rec = null;
@@ -2865,9 +2878,6 @@ function showResults() {
   };
   const assisted = assistOn() || stats.assistUsed;
   const medal = assisted ? 0 : medalFor(i, stats.time);
-  const secs = stats.time / 60, bTime = Math.max(0, Math.round(medalTimes(i)[2] - secs)) * 50;
-  const bHearts = P.hearts * 300, bNoFall = stats.deaths === 0 ? 1000 : 0, bSeeds = stats.seeds >= stats.seedsTotal ? 2000 : 0, bGems = gemsN === 3 ? 1000 : 0;
-  const total = stats.score + bTime + bHearts + bNoFall + bSeeds + bGems;
   const prevHS = prev && prev.score || 0, newHS = !assisted && counts && total > prevHS;
   save.best[i].score = Math.max(prevHS, assisted ? 0 : total);
   if (assisted && prev) save.best[i].time = prev.time; else if (assisted) save.best[i].time = 359999;
@@ -2985,7 +2995,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.5';
+const APP_VERSION = '1.5.6';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;

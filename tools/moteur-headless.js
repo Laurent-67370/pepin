@@ -3,8 +3,15 @@
    Sert aux tests de déterminisme, et servira au rejeu des parties (fantôme, validation des scores). */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const SCRIPT = HTML.slice(HTML.indexOf('<script>') + 8, HTML.lastIndexOf('</script>'));
+// Le jeu est lu à la demande : celui du dépôt par défaut, ou un autre index.html (le serveur garde une copie par version)
+let jeuParDefaut = null;
+const scriptDe = html => html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+const compiles = new Map(); // un script compilé par version du jeu
+function compiler(html) {
+  let c = compiles.get(html);
+  if (!c) { c = new vm.Script(scriptDe(html), { filename: 'index.html' }); compiles.set(html, c); if (compiles.size > 4) compiles.delete(compiles.keys().next().value); }
+  return c;
+}
 
 // Objet « absorbant » : toute propriété, tout appel, toute construction renvoie encore un objet inerte
 function inerte() {
@@ -25,13 +32,15 @@ function inerte() {
 }
 
 /* Crée un moteur isolé. alea : générateur utilisé à la place de Math.random (affichage uniquement).
-   reglages : valeurs de save.settings à imposer (classic, invincible, easyJump…). */
-function creerMoteur({ alea = Math.random, reglages = {} } = {}) {
+   reglages : valeurs de save.settings à imposer (classic, invincible, easyJump…).
+   html : texte d'un index.html (par défaut celui du dépôt). */
+function creerMoteur({ alea = Math.random, reglages = {}, html } = {}) {
+  if (html == null) html = jeuParDefaut || (jeuParDefaut = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8'));
   const stockage = new Map();
   const g = {
     console, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: () => 0, cancelAnimationFrame() {}, queueMicrotask() {},
-    performance: { now: () => 0 }, crypto: globalThis.crypto, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, btoa, atob,
+    performance: { now: () => 0 }, crypto: globalThis.crypto || require('crypto').webcrypto /* global seulement depuis Node 19 */, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, btoa, atob,
     fetch: () => new Promise(() => {}), innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1,
     localStorage: { getItem: k => (stockage.has(k) ? stockage.get(k) : null), setItem: (k, v) => stockage.set(k, String(v)), removeItem: k => stockage.delete(k) },
     document: inerte(), navigator: inerte(), location: inerte(), history: inerte(), screen: inerte(),
@@ -43,7 +52,7 @@ function creerMoteur({ alea = Math.random, reglages = {} } = {}) {
   g.navigator.getGamepads = () => [];
   const ctx = vm.createContext(g);
   vm.runInContext(`Math.random = __alea;`, Object.assign(ctx, { __alea: alea }));
-  vm.runInContext(SCRIPT, ctx, { filename: 'index.html' });
+  compiler(html).runInContext(ctx);
   vm.runInContext(`Object.assign(save.settings, ${JSON.stringify(reglages)})`, ctx);
   const ev = code => vm.runInContext(code, ctx);
 
@@ -91,4 +100,14 @@ function joueurRobot(graine) {
   };
 }
 
-module.exports = { creerMoteur, joueurRobot, mulberry };
+/* Joueur robot « fonceur » : toujours vers la droite, sauts de durée variable, un peu d'élan. Il termine le monde 1. */
+function robotFonceur(graine) {
+  const r = mulberry(graine); let saut = 0, el = 0;
+  return () => {
+    const ns = saut === 0 && r() < 0.09; if (ns) saut = 4 + Math.floor(r() * 26); else if (saut > 0) saut--;
+    const ne = r() < 0.015; el = ne ? 4 : Math.max(0, el - 1);
+    return { x: 1, down: false, jump: saut > 0, dash: el > 0, jumpPressed: ns, dashPressed: ne };
+  };
+}
+
+module.exports = { creerMoteur, joueurRobot, robotFonceur, mulberry };

@@ -26,6 +26,8 @@ jobs:
         run: node --test tests/rejeu.test.js
       - name: Fantôme du meilleur temps
         run: node --test tests/fantome.test.js
+      - name: Vérification des parties par le serveur
+        run: node --test tests/verif.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes
