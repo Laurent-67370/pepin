@@ -251,7 +251,7 @@ body.has-touch.playing #touch{display:block;}
 
     <section id="pBye" class="panel">
       <h2>À bientôt !</h2>
-      <p class="sub">Ta progression est enregistrée. Tu peux fermer cet onglet ou l'application.</p>
+      <p class="sub" id="byeTxt">Ta progression est enregistrée.</p>
       <div class="stack"><button class="btn primary" data-act="menu">Rejouer</button></div>
     </section>
 
@@ -2417,6 +2417,7 @@ function showPanel(name, push = true) {
   overlay.classList.toggle('clear', name === 'title');
   for (const k in panels) document.getElementById(panels[k]).classList.toggle('show', k === name);
   if (push) panelStack.push(name);
+  if (name !== 'title' && name !== 'bye' && typeof armBack === 'function') armBack();
   document.body.classList.remove('playing');
   const first = document.querySelector('#' + panels[name] + ' .btn:not([disabled])');
   if (first && !usedTouch) setTimeout(() => first.focus({ preventScroll: true }), 30);
@@ -2495,11 +2496,11 @@ function renderLevelList() {
   });
 }
 function startLevel(i) {
-  AU.init(); loadLevel(i); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
+  armBack(); AU.init(); loadLevel(i); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
 }
 function goMenu() {
   if (pendingReload) { location.reload(); return; }
-  state = 'menu'; loadLevel(0); cam.x = 0; showPanel('title'); panelStack = ['title']; playSong(3);
+  state = 'menu'; loadLevel(0); cam.x = 0; showPanel('title'); panelStack = ['title']; playSong(3); disarmBack();
 }
 function openPause() {
   if (state !== 'play') return;
@@ -2575,7 +2576,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -2589,24 +2590,32 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && /github\.i
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController) { hadController = true; return; } if (state === 'menu') location.reload(); else pendingReload = true; });
 }
 
-/* Quitter le jeu, et bouton/geste Retour d'Android */
+/* Quitter le jeu, et bouton/geste Retour d'Android.
+   Une application web n'a pas le droit de se fermer elle-même sur Android :
+   on fait donc en sorte qu'un seul geste Retour suffise à la fermer depuis l'écran titre. */
+const backNav = location.protocol === 'https:' && !/claude/.test(location.hostname);
+let backArmed = false, ignorePop = false;
+function armBack() { if (backNav && !backArmed) try { history.pushState({ pepin: 1 }, ''); backArmed = true; } catch (e) {} }
+function disarmBack() { if (backNav && backArmed) { backArmed = false; ignorePop = true; try { history.back(); } catch (e) { ignorePop = false; } } }
+if (backNav) addEventListener('popstate', () => {
+  if (ignorePop) { ignorePop = false; return; }
+  backArmed = false;
+  if (state === 'play') { openPause(); armBack(); }
+  else if (state === 'pause') { resumeGame(); armBack(); }
+  else if (state === 'results') goMenu();
+  else if (panelStack.length > 1) { back(); if (panelStack[panelStack.length - 1] !== 'title') armBack(); }
+});
 function quitGame() {
   persist(); stopSong(); releaseAllTouch();
   state = 'menu'; loadLevel(0); cam.x = 0;
   try { window.close(); } catch (e) {}
-  setTimeout(() => { if (!document.hidden) { panelStack = []; showPanel('bye'); } }, 250);
-}
-const backNav = location.protocol === 'https:' && !/claude/.test(location.hostname);
-function armBack() { if (backNav) try { history.pushState({ pepin: Date.now() }, ''); } catch (e) {} }
-if (backNav) {
-  armBack();
-  addEventListener('popstate', () => {
-    if (state === 'play') { openPause(); armBack(); }
-    else if (state === 'pause') { resumeGame(); armBack(); }
-    else if (state === 'results') { goMenu(); armBack(); }
-    else if (panelStack.length > 1) { back(); armBack(); }
-    else history.back();
-  });
+  setTimeout(() => {
+    if (document.hidden) return;
+    document.getElementById('byeTxt').textContent = standalone
+      ? 'Ta progression est enregistrée. Fais maintenant le geste Retour (ou le bouton Retour) pour fermer l\'application.'
+      : 'Ta progression est enregistrée. Tu peux fermer cet onglet.';
+    panelStack = []; showPanel('bye'); disarmBack();
+  }, 250);
 }
 
 /* Réglages */
