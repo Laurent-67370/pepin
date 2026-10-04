@@ -164,6 +164,13 @@ body.has-touch.playing #touch{display:block;}
 .stats{margin:14px 0 18px;font-size:19px;}
 .stats div{display:flex;justify-content:space-between;padding:7px 0;border-bottom:2px dashed rgba(122,90,68,.35);}
 .stats div:last-child{border-bottom:0;}
+.stats .sc{font-size:16px;color:var(--muted);padding:4px 0;}
+.stats .total{font-size:24px;border-top:3px solid var(--bark);border-bottom:0;padding-top:10px;margin-top:4px;}
+.hs{margin:-12px 0 16px;font-size:17px;color:var(--text);}
+.hs strong{color:var(--amber-d);}
+.scoreRow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:2px dashed rgba(122,90,68,.35);font-size:17px;}
+.scoreRow small{display:block;font-size:13px;color:var(--muted);}
+.scoreRow.tot{font-size:22px;border-top:3px solid var(--bark);border-bottom:0;margin-top:6px;padding-top:12px;}
 .badge{display:inline-block;background:var(--leaf);color:#fff;font-size:14px;padding:2px 8px;border-radius:5px;margin-left:8px;vertical-align:middle;}
 @media (max-height:460px){
   .panel{padding:14px 18px 16px;}
@@ -192,9 +199,11 @@ body.has-touch.playing #touch{display:block;}
     <section id="pTitle" class="panel">
       <h1>Pépin</h1>
       <p class="tag">La graine voyageuse rallume les lanternes de la forêt.</p>
+      <p class="hs" id="hsTotal" hidden></p>
       <div class="stack">
         <button class="btn primary" data-act="play">Jouer</button>
         <button class="btn" data-act="levels">Carte du monde</button>
+        <button class="btn" data-act="scores">Meilleurs scores</button>
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="quit">Quitter le jeu</button>
         <button class="btn" data-act="install" id="btnInstall" hidden>Installer le jeu sur cet appareil</button>
@@ -247,6 +256,13 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn" data-act="menu">Retour au menu</button>
         <button class="btn" data-act="quit">Quitter le jeu</button>
       </div>
+    </section>
+
+    <section id="pScores" class="panel">
+      <h2>Meilleurs scores</h2>
+      <p class="sub">Le score total additionne ton meilleur score dans chaque monde.</p>
+      <div id="scoreList"></div>
+      <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
     </section>
 
     <section id="pBye" class="panel">
@@ -1147,7 +1163,7 @@ function loadLevel(i) {
     if (e.skin === 'penguin') e.vx = -0.7; else if (e.skin === 'scorpion') e.vx = -0.55; else if (e.skin === 'frog') { e.vx = 0; e.t = (e.x * 3) % 90; }
     if (e.type === 'w') { e.hx = e.x0; e.hy = e.y0; e.st = 'idle'; e.cd = 0; }
   }
-  stats = { seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: !!save.settings.classic, lives: 3, nextLife: 25 };
+  stats = { score: 0, combo: 0, seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: !!save.settings.classic, lives: 3, nextLife: 25 };
   cam.x = clamp(P.x - VW / 2, 0, L.w * T - VW); cam.y = clamp(P.y - VH * 0.55, minCamY(), maxCamY());
   crumbles = new Map(); irisT = 34; wind.active = wind.warn = false;
   introT = 170; bossIntroT = 0; clearT = 0; fadeT = 0; shake = 0;
@@ -1197,7 +1213,7 @@ function standingOnSemi() {
 function breakCrate(tx, ty) {
   L.g[ty][tx] = '.';
   for (let i = 0; i < 12; i++) particles.push({ x: tx * T + 8, y: ty * T + 8, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 4 - 1, life: 40, max: 40, c: i % 2 ? '#b8783a' : '#4a2a14', s: 2 + (i % 2), g: 0.25 });
-  addSeeds(1); texts.push({ x: tx * T + 8, y: ty * T, txt: '+1', life: 45 });
+  addSeeds(1); addScore(25, tx * T + 8, ty * T, '+25');
   SFX.crate(); SFX.seed(); addShake(3); buzz(12);
 }
 
@@ -1431,7 +1447,7 @@ function updatePlayer() {
   if (p.inv > 0) p.inv--; if (p.dropT > 0) p.dropT--; if (p.buffer > 0) p.buffer--; if (p.coyote > 0) p.coyote--; if (p.dashCD > 0) p.dashCD--;
   const easy = !!save.settings.easyJump;
   if (p.onGround) {
-    p.coyote = easy ? 12 : 6; p.airJump = easy; if (p.dashT === 0 && p.dashCD < 12) p.dashUsed = false;
+    stats.combo = 0; p.coyote = easy ? 12 : 6; p.airJump = easy; if (p.dashT === 0 && p.dashCD < 12) p.dashUsed = false;
     if (!p.mover) { const fy = Math.floor((p.y + p.h + 1) / T), l = tileAt(Math.floor(p.x / T), fy), r = tileAt(Math.floor((p.x + p.w - 0.01) / T), fy); if ((isSolid(l) || l === '-') && (isSolid(r) || r === '-') && l !== 'c' && r !== 'c') p.safe = { x: p.x, y: p.y }; }
   }
   if (ctl && input.jumpPressed) p.buffer = easy ? 14 : 8;
@@ -1499,7 +1515,7 @@ function updatePlayer() {
     }
     for (const c of checkpoints) {
       if (!c.lit && overlap(p, c)) {
-        c.lit = true; respawnPt = { x: c.rx, y: c.ry }; SFX.check(); buzz(20);
+        c.lit = true; respawnPt = { x: c.rx, y: c.ry }; SFX.check(); buzz(20); addScore(50);
         texts.push({ x: c.x + 8, y: c.y - 4, txt: 'Lanterne allumée', life: 80 });
         for (let i = 0; i < 18; i++) particles.push({ x: c.x + 8, y: c.y + 6, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 3, life: 50, max: 50, c: '#ffd36b', s: 2, g: 0.02, glow: true });
       }
@@ -1526,6 +1542,11 @@ function hurt(srcX) {
   p.inv = 90; p.vy = -4.5; p.vx = (p.x + p.w / 2 < srcX ? -1 : 1) * 2.6; p.hurtT = 16; p.jumping = false;
   SFX.hurt(); buzz(45); addShake(4);
   if (p.hearts <= 0) loseLife();
+}
+const fmtNum = n => Math.round(n).toLocaleString('fr-FR');
+function addScore(n, x, y, label) {
+  stats.score += n;
+  if (x != null) texts.push({ x, y, txt: label || '+' + n, life: 55 });
 }
 function addSeeds(n) {
   stats.seeds += n;
@@ -1589,6 +1610,9 @@ function shatter(e) {
 }
 function splash(e) { for (let i = 0; i < 7; i++) particles.push({ x: e.x + 6, y: e.y0, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2.2, life: 22, max: 22, c: '#bfe9f5', s: 2, g: 0.15 }); }
 function killEnemy(e, dir) {
+  const ex = e.x + e.w / 2, ey = e.y - 4;
+  if (dir) addScore(150, ex, ey);
+  else { stats.combo++; const pts = Math.min(1000, 100 * Math.pow(2, stats.combo - 1)); addScore(pts, ex, ey, stats.combo > 1 ? `+${pts} ×${stats.combo}` : '+' + pts); }
   e.dead = true; e.vy = -3.2; e.vx = dir ? dir * 2.2 : (Math.random() < 0.5 ? -0.6 : 0.6); e.rot = 0;
   SFX.stomp(); addShake(2.5); buzz(14);
   const col = e.type === 'b' ? '#b39cf5' : e.type === 'x' ? '#d6df6d' : e.type === 'f' ? '#5fd0ec' : '#ffcf3a';
@@ -1664,10 +1688,10 @@ function updateItems() {
     if (state !== 'play' || !overlap(P, it)) continue;
     it.got = true;
     const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
-    if (it.k === 'seed') { addSeeds(1); SFX.seed(); for (let i = 0; i < 6; i++) particles.push({ x: cx, y: cy, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2, life: 20, max: 20, c: '#ffe08a', s: 1, g: 0, glow: true }); }
-    else if (it.k === 'gem') { stats.gems[it.gi] = true; SFX.gem(); buzz(25); texts.push({ x: cx, y: cy - 8, txt: 'Rosée ' + (stats.gems.filter(Boolean).length) + '/3', life: 70 }); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; particles.push({ x: cx, y: cy, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, life: 35, max: 35, c: '#d4f8ff', s: 2, g: 0, glow: true }); } }
-    else if (it.k === 'heart') { if (P.hearts < 3) P.hearts++; else { addSeeds(5); texts.push({ x: cx, y: cy - 6, txt: '+5', life: 45 }); } SFX.power(); }
-    else if (it.k === 'leaf') { P.leaf = true; SFX.power(); buzz(20); texts.push({ x: cx, y: cy - 8, txt: 'Feuille : plane en gardant Saut', life: 110 }); }
+    if (it.k === 'seed') { addSeeds(1); addScore(10); SFX.seed(); for (let i = 0; i < 6; i++) particles.push({ x: cx, y: cy, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2, life: 20, max: 20, c: '#ffe08a', s: 1, g: 0, glow: true }); }
+    else if (it.k === 'gem') { stats.gems[it.gi] = true; addScore(500, cx, cy - 18, '+500'); SFX.gem(); buzz(25); texts.push({ x: cx, y: cy - 8, txt: 'Rosée ' + (stats.gems.filter(Boolean).length) + '/3', life: 70 }); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; particles.push({ x: cx, y: cy, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, life: 35, max: 35, c: '#d4f8ff', s: 2, g: 0, glow: true }); } }
+    else if (it.k === 'heart') { if (P.hearts < 3) P.hearts++; else { addSeeds(5); addScore(50, cx, cy - 6, '+50'); } SFX.power(); }
+    else if (it.k === 'leaf') { P.leaf = true; addScore(100); SFX.power(); buzz(20); texts.push({ x: cx, y: cy - 8, txt: 'Feuille : plane en gardant Saut', life: 110 }); }
   }
 }
 
@@ -1738,7 +1762,7 @@ function updateBoss() {
   }
 }
 function bossHit(stomp) {
-  const b = boss; b.hp--; b.inv = 50; addShake(7); SFX.stomp(); SFX.hurt(); buzz(50);
+  const b = boss; b.hp--; addScore(b.hp <= 0 ? 5000 : 1000, b.x + b.w / 2, b.y - 14); b.inv = 50; addShake(7); SFX.stomp(); SFX.hurt(); buzz(50);
   if (stomp) { P.vy = -6.2; P.jumping = false; } else { P.dashT = 0; P.vx = -P.face * 2.5; P.vy = -3; }
   for (let i = 0; i < 18; i++) particles.push({ x: b.x + b.w / 2, y: b.y + 4, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 3, life: 35, max: 35, c: i % 2 ? '#ffcf3a' : '#ffffff', s: 2, g: 0.12 });
   if (b.hp <= 0) {
@@ -2342,9 +2366,10 @@ function drawHUD() {
   dctx.globalAlpha = 1;
   { const md = assistOn() || stats.assistUsed ? -1 : medalFor(levelIdx, stats.time); hudText(fmtTime(stats.time), cvs.width / 2, pad, 9 * u, 'center', md < 0 ? '#c8b8a8' : md === 3 ? '#ffd34d' : md === 2 ? '#e6eef4' : md === 1 ? '#e8a868' : '#fff3dc'); }
   if (boss && boss.st !== 'wait' && boss.st !== 'gone' && boss.st !== 'flee') {
-    hudText(boss.name, cvs.width / 2, pad + 12 * u, 7.5 * u, 'center', '#ffcf3a');
-    for (let i = 0; i < boss.max; i++) { const w = 14 * u, x = cvs.width / 2 - (boss.max * (w + 3 * u)) / 2 + i * (w + 3 * u); dctx.fillStyle = '#2a1a12'; dctx.fillRect(x, pad + 22 * u, w, 5 * u); dctx.fillStyle = i < boss.hp ? '#e8862a' : '#5a4a44'; dctx.fillRect(x + u, pad + 23 * u, w - 2 * u, 3 * u); }
+    hudText(boss.name, cvs.width / 2, pad + 23 * u, 7.5 * u, 'center', '#ffcf3a');
+    for (let i = 0; i < boss.max; i++) { const w = 14 * u, x = cvs.width / 2 - (boss.max * (w + 3 * u)) / 2 + i * (w + 3 * u); dctx.fillStyle = '#2a1a12'; dctx.fillRect(x, pad + 33 * u, w, 5 * u); dctx.fillStyle = i < boss.hp ? '#e8862a' : '#5a4a44'; dctx.fillRect(x + u, pad + 34 * u, w - 2 * u, 3 * u); }
   }
+  { const hs = save.best[levelIdx] && save.best[levelIdx].score || 0; hudText(fmtNum(stats.score), cvs.width / 2, pad + 11 * u, 8 * u, 'center', hs && stats.score > hs ? '#9fe06a' : '#fff3dc'); }
   if (bossIntroT > 0) { bossIntroT--; dctx.globalAlpha = Math.min(1, bossIntroT / 20); hudText('Attention !', cvs.width / 2, cvs.height * 0.42, 16 * u, 'center', '#ffcf3a'); dctx.globalAlpha = 1; }
   // textes flottants
   for (const t of texts) {
@@ -2409,7 +2434,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', layout);
    Menus et écrans
    ========================================================= */
 const overlay = document.getElementById('overlay');
-const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye' };
+const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores' };
 let panelStack = [];
 function showPanel(name, push = true) {
   releaseAllTouch();
@@ -2479,9 +2504,20 @@ function showMapInfo(i, locked) {
   const lv = LEVELS[i], best = save.best[i], el = document.getElementById('mapInfo'), m = medalTimes(i);
   if (locked) { el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>Termine le monde précédent pour l'ouvrir.</div>`; return; }
   const med = best && best.medal ? best.medal : 0;
-  const line = best ? `${best.time < 359999 ? 'Record ' + fmtTime(best.time) : 'Terminé avec assistance'} · ${best.seeds} graines · <span class="medal m${med}"></span>${MEDAL_NAME[med]}` : 'Pas encore terminé';
+  const line = best ? `${best.score ? 'Meilleur score ' + fmtNum(best.score) + ' · ' : ''}${best.time < 359999 ? 'Record ' + fmtTime(best.time) : 'Terminé avec assistance'} · ${best.seeds} graines · <span class="medal m${med}"></span>${MEDAL_NAME[med]}` : 'Pas encore terminé';
   el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>${line}<br>Or ${fmtSec(m[0])} · Argent ${fmtSec(m[1])} · Bronze ${fmtSec(m[2])}</div>`;
   const b = document.createElement('button'); b.className = 'btn primary'; b.textContent = 'Jouer'; b.onclick = () => { SFX.click(); startLevel(i); }; el.appendChild(b);
+}
+const totalHS = () => Object.values(save.best).reduce((a, b) => a + (b && b.score || 0), 0);
+function updateTitleHS() { const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
+function renderScores() {
+  let h = '';
+  LEVELS.forEach((lv, i) => {
+    const b = save.best[i], locked = i + 1 > save.unlocked, sc = b && b.score || 0, med = b && b.medal || 0;
+    h += `<div class="scoreRow"><span>${i + 1}. ${lv.name}<small>${locked ? 'Verrouillé' : b ? `<span class="medal m${med}"></span>${MEDAL_NAME[med]}${b.time < 359999 ? ' · ' + fmtTime(b.time) : ''}` : 'Pas encore terminé'}</small></span><strong>${sc ? fmtNum(sc) : '—'}</strong></div>`;
+  });
+  h += `<div class="scoreRow tot"><span>Total</span><strong>${fmtNum(totalHS())}</strong></div>`;
+  document.getElementById('scoreList').innerHTML = h;
 }
 function renderLevelList() {
   const list = document.getElementById('levelList'); list.innerHTML = '';
@@ -2500,7 +2536,7 @@ function startLevel(i) {
 }
 function goMenu() {
   if (pendingReload) { location.reload(); return; }
-  state = 'menu'; loadLevel(0); cam.x = 0; showPanel('title'); panelStack = ['title']; playSong(3); disarmBack();
+  state = 'menu'; loadLevel(0); cam.x = 0; updateTitleHS(); showPanel('title'); panelStack = ['title']; playSong(3); disarmBack();
 }
 function openPause() {
   if (state !== 'play') return;
@@ -2522,11 +2558,17 @@ function showResults() {
   };
   const assisted = assistOn() || stats.assistUsed;
   const medal = assisted ? 0 : medalFor(i, stats.time);
+  const secs = stats.time / 60, bTime = Math.max(0, Math.round(medalTimes(i)[2] - secs)) * 50;
+  const bHearts = P.hearts * 300, bNoFall = stats.deaths === 0 ? 1000 : 0, bSeeds = stats.seeds >= stats.seedsTotal ? 2000 : 0, bGems = gemsN === 3 ? 1000 : 0;
+  const total = stats.score + bTime + bHearts + bNoFall + bSeeds + bGems;
+  const prevHS = prev && prev.score || 0, newHS = !assisted && total > prevHS;
+  save.best[i].score = Math.max(prevHS, assisted ? 0 : total);
   if (assisted && prev) save.best[i].time = prev.time; else if (assisted) save.best[i].time = 359999;
   if (medal > save.best[i].medal) save.best[i].medal = medal;
   const mt = medalTimes(i), nextM = medal < 3 && !assisted ? `${MEDAL_NAME[medal + 1]} en moins de ${fmtSec(mt[2 - medal])}` : '';
   if (save.unlocked < i + 2) save.unlocked = Math.min(LEVELS.length, i + 2);
   persist();
+  if (newHS) setTimeout(() => SFX.gem(), 500);
   const last = i === LEVELS.length - 1;
   document.getElementById('rTitle').textContent = last ? 'Toutes les lanternes brillent' : `${L.def.name} : terminé`;
   document.getElementById('rSub').textContent = last ? 'Le Frelon Royal s\'est envolé pour de bon et Pépin a rallumé les douze lanternes. Reviens chercher les rosées manquantes.' : 'La lanterne est rallumée. En route vers le monde suivant.';
@@ -2535,7 +2577,15 @@ function showResults() {
     `<div><span>Gouttes de rosée</span><strong>${gemsN}/3</strong></div>` +
     `<div><span>Temps</span><strong>${fmtTime(stats.time)}${isRecord && prev && !assisted ? '<span class="badge">Record</span>' : ''}</strong></div>` +
     (assisted ? `<div><span>Médaille</span><strong style="font-size:15px">Désactivée en mode assistance</strong></div>` : `<div><span>Médaille</span><strong><span class="medal m${medal}"></span>${MEDAL_NAME[medal]}</strong></div>` + (nextM ? `<div><span>Prochaine</span><strong style="font-size:15px">${nextM}</strong></div>` : '')) +
-    `<div><span>Chutes</span><strong>${stats.deaths}</strong></div>` + (stats.classic ? `<div><span>Vies restantes</span><strong>${stats.lives}</strong></div>` : '');
+    `<div><span>Chutes</span><strong>${stats.deaths}</strong></div>` + (stats.classic ? `<div><span>Vies restantes</span><strong>${stats.lives}</strong></div>` : '') +
+    `<div class="sc"><span>Points en jeu</span><strong>${fmtNum(stats.score)}</strong></div>` +
+    `<div class="sc"><span>Bonus temps</span><strong>${fmtNum(bTime)}</strong></div>` +
+    `<div class="sc"><span>Bonus cœurs (${P.hearts})</span><strong>${fmtNum(bHearts)}</strong></div>` +
+    (bNoFall ? `<div class="sc"><span>Sans chute</span><strong>${fmtNum(bNoFall)}</strong></div>` : '') +
+    (bSeeds ? `<div class="sc"><span>Toutes les graines</span><strong>${fmtNum(bSeeds)}</strong></div>` : '') +
+    (bGems ? `<div class="sc"><span>Toutes les rosées</span><strong>${fmtNum(bGems)}</strong></div>` : '') +
+    `<div class="total"><span>Score</span><strong>${fmtNum(total)}${newHS ? '<span class="badge">Nouveau record</span>' : ''}</strong></div>` +
+    (assisted ? `<div><span>Record</span><strong style="font-size:15px">Hors classement (assistance)</strong></div>` : `<div><span>Meilleur score</span><strong>${fmtNum(Math.max(prevHS, total))}</strong></div>`);
   const btns = document.getElementById('rButtons'); btns.innerHTML = '';
   const add = (label, fn, primary) => { const b = document.createElement('button'); b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = () => { SFX.click(); fn(); }; btns.appendChild(b); };
   if (!last) add('Monde suivant', () => startLevel(i + 1), true);
@@ -2565,6 +2615,7 @@ overlay.addEventListener('click', e => {
   else if (a === 'restart') startLevel(levelIdx);
   else if (a === 'menu') goMenu();
   else if (a === 'quit') quitGame();
+  else if (a === 'scores') { renderScores(); showPanel('scores'); }
   else if (a === 'fullscreen') toggleFullscreen();
   else if (a === 'install') installApp();
 });
@@ -2576,7 +2627,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.3.0';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
