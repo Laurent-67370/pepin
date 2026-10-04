@@ -18,9 +18,18 @@ const NAME_RE = /^[\p{L}\p{N} _.'-]{2,12}$/u;
 fs.mkdirSync(DATA_DIR, { recursive: true });
 let db = { entries: {} }; // clé "device|level" -> { name, device, level, score, time, date }
 try { db = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) {}
+const PURGE_MS = 30 * 24 * 3600 * 1000; // au-delà de 30 jours
+function purgeOld(dry) {
+  const cut = Date.now() - PURGE_MS;
+  let n = 0;
+  for (const k of Object.keys(db.entries)) if (db.entries[k].date < cut) { if (!dry) delete db.entries[k]; n++; }
+  return n;
+}
+purgeOld(); // au démarrage
 let saveTimer = null;
 function persist() {
   clearTimeout(saveTimer);
+  purgeOld(); // à chaque écriture
   saveTimer = setTimeout(() => { const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, FILE); }, 200);
 }
 function flushSync() { clearTimeout(saveTimer); const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, FILE); }
