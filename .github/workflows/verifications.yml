@@ -8,9 +8,9 @@ on:
 
 jobs:
   rapide:
-    name: Cohérence et serveur
+    name: Cohérence, serveur et déterminisme
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +20,8 @@ jobs:
         run: node tools/verifier-coherence.js
       - name: Tests du serveur de classement
         run: node --test tests/serveur.test.js
+      - name: Déterminisme du jeu (même graine et mêmes entrées, même partie)
+        run: node --test tests/determinisme.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes

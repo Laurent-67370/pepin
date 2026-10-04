@@ -22,7 +22,8 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - `node tools/verifier-niveaux.js [numéro de monde]` rejoue la physique du saut et signale toute arrivée, graine, goutte ou caisse inaccessible.
 - `node tools/verifier-coherence.js` contrôle que `APP_VERSION` (index.html) et `VERSION` (sw.js) correspondent, et que le jeu et le serveur tirent le même monde du jour.
 - `node --test tests/serveur.test.js` teste le serveur de classement (validation, défi du jour, anti-abus, sauvegarde, purge).
+- `node --test tests/determinisme.test.js` fait tourner le vrai jeu dans Node (`tools/moteur-headless.js`) et vérifie qu'une même graine et les mêmes entrées donnent exactement la même partie, quels que soient l'écran et l'aléatoire de l'affichage.
 
-Ces trois vérifications tournent automatiquement sur GitHub Actions à chaque push.
+Ces vérifications tournent automatiquement sur GitHub Actions à chaque push.
 
 Pixel art procédural et musiques Web Audio, tout est généré par code. La progression est enregistrée dans le navigateur.
