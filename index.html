@@ -198,6 +198,7 @@ body.has-touch.playing #touch{display:block;}
 .scoreRow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:2px dashed rgba(122,90,68,.35);font-size:17px;}
 .scoreRow small{display:block;font-size:13px;color:var(--muted);}
 .scoreRow.tot{font-size:22px;border-top:3px solid var(--bark);border-bottom:0;margin-top:6px;padding-top:12px;}
+.setHead{font-size:19px;margin:18px 0 4px;}
 .badge{display:inline-block;background:var(--leaf);color:#fff;font-size:14px;padding:2px 8px;border-radius:5px;margin-left:8px;vertical-align:middle;}
 @media (max-height:460px){
   .panel{padding:14px 18px 16px;}
@@ -273,6 +274,11 @@ body.has-touch.playing #touch{display:block;}
       <label class="set"><span>Assistance : sauts faciles<small style="display:block;font-size:13px;color:var(--muted)">Double saut, et saut accepté plus longtemps au bord du vide.</small></span><input type="checkbox" id="sEasyJump"></label>
       <label class="set"><span>Mode classique<small style="display:block;font-size:13px;color:var(--muted)">3 vies par monde, Game Over possible. Pris en compte au prochain monde.</small></span><input type="checkbox" id="sClassic"></label>
       <label class="set"><span>Fantôme du meilleur temps<small style="display:block;font-size:13px;color:var(--muted)">Ta meilleure partie du monde court à côté de toi, en transparence.</small></span><input type="checkbox" id="sGhost"></label>
+      <h3 class="setHead">Sauvegarde</h3>
+      <p class="sub" style="margin-top:0">Pour changer d'appareil, ou te protéger si le navigateur efface ses données.</p>
+      <div class="stack"><button class="btn" data-act="export">Exporter ma progression</button><button class="btn" data-act="import">Importer une sauvegarde</button></div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <p class="hint" id="saveMsg" role="status"></p>
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
       <p class="hint" id="appVersion"></p>
     </section>
@@ -2869,7 +2875,7 @@ function showResults() {
     if (counts && !(assistOn() || stats.assistUsed) && stats.time < bestT) storeBestReplay(i, done);
   }
   const backToResults = () => { state = 'results'; panelStack = []; showPanel('results'); playSong(3); };
-  const addReplayBtn = add => { if (done) add('Revoir la partie', () => startReplay(done, backToResults)); };
+  const addReplayBtn = add => { if (done) add('Revoir la partie', () => startReplay(done, backToResults)); add('Partager mon score', () => shareScore([...document.getElementById('rButtons').children].find(b => b.textContent.startsWith('Partager')))); };
   save.best[i] = {
     time: prev ? Math.min(prev.time, stats.time) : stats.time,
     seeds: prev ? Math.max(prev.seeds, stats.seeds) : stats.seeds,
@@ -2878,6 +2884,7 @@ function showResults() {
   };
   const assisted = assistOn() || stats.assistUsed;
   const medal = assisted ? 0 : medalFor(i, stats.time);
+  lastResult = { level: i, world: L.def.name, sub: L.def.sub, score: total, time: stats.time, medal, assisted, seeds: stats.seeds, seedsTotal: stats.seedsTotal, gems: gemsN, daily: dailyRun, name: save.playerName && save.playerName !== 'Joueur 1' ? save.playerName : '' };
   const prevHS = prev && prev.score || 0, newHS = !assisted && counts && total > prevHS;
   save.best[i].score = Math.max(prevHS, assisted ? 0 : total);
   if (assisted && prev) save.best[i].time = prev.time; else if (assisted) save.best[i].time = 359999;
@@ -2974,7 +2981,9 @@ overlay.addEventListener('click', e => {
   const a = b.dataset.act;
   if (a === 'play') { const next = Math.min(save.unlocked, LEVELS.length) - 1; const firstUnfinished = LEVELS.findIndex((_, i) => !save.best[i]); startLevel(firstUnfinished >= 0 && firstUnfinished <= next ? firstUnfinished : next); }
   else if (a === 'levels') { showPanel('levels'); renderMap(); }
-  else if (a === 'settings') { fillSettings(); showPanel('settings'); }
+  else if (a === 'settings') { fillSettings(); document.getElementById('saveMsg').textContent = ''; showPanel('settings'); }
+  else if (a === 'export') exportSave();
+  else if (a === 'import') { const f = document.getElementById('importFile'); f.value = ''; f.click(); }
   else if (a === 'back') back();
   else if (a === 'resume') resumeGame();
   else if (a === 'restart') startLevel(levelIdx, !!dailyRun);
@@ -2995,7 +3004,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.6';
+const APP_VERSION = '1.5.7';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -3035,6 +3044,162 @@ function quitGame() {
       : 'Ta progression est enregistrée. Tu peux fermer cet onglet.';
     panelStack = []; showPanel('bye'); disarmBack();
   }, 250);
+}
+
+/* =========================================================
+   Sauvegarde : export et import (pour changer d'appareil, ou se protéger d'un effacement du navigateur)
+   ========================================================= */
+const EXPORT_FORMAT = 'pepin-sauvegarde', MAX_PROFILES = 6;
+function buildExport() {
+  return { format: EXPORT_FORMAT, v: 1, app: APP_VERSION, date: new Date().toISOString(), current: save.current,
+    profiles: JSON.parse(JSON.stringify(save.profiles)), hof: JSON.parse(JSON.stringify(save.hof || {})), replays: loadReplays() };
+}
+/* Nettoie un profil venu d'un fichier : seuls les champs connus, aux bons types (le fichier a pu être modifié à la main) */
+function cleanProfile(p, i) {
+  if (!p || typeof p !== 'object' || typeof p.id !== 'string' || !/^[\w-]{8,64}$/.test(p.id)) return null;
+  const num = (v, a, b, d) => Number.isFinite(v) ? clamp(Math.round(v), a, b) : d;
+  const best = {};
+  for (const [k, b] of Object.entries(p.best || {})) {
+    const lv = +k; if (!Number.isInteger(lv) || lv < 0 || lv >= LEVELS.length || !b || typeof b !== 'object') continue;
+    best[lv] = { time: num(b.time, 1, 359999, 359999), seeds: num(b.seeds, 0, 999, 0), gems: [0, 1, 2].map(g => !!(b.gems && b.gems[g])), medal: num(b.medal, 0, 3, 0), score: num(b.score, 0, 60000, 0) };
+  }
+  const daily = {};
+  for (const [d, v] of Object.entries(p.daily || {})) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(v)) daily[d] = num(v, 0, 60000, 0);
+  const name = typeof p.name === 'string' && /^[\p{L}\p{N} _.'-]{2,12}$/u.test(p.name.trim()) ? p.name.trim() : 'Joueur ' + (i + 1);
+  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily,
+    uid: typeof p.uid === 'string' && /^[a-f0-9-]{16,40}$/i.test(p.uid) ? p.uid : newUid() };
+}
+/* Fusionne une sauvegarde importée : profils ajoutés ou remplacés (même identifiant), tableaux d'honneur réunis,
+   meilleure partie gardée par monde. Les réglages de cet appareil ne bougent pas. Renvoie un bilan, ou une erreur. */
+function mergeImport(data) {
+  if (!data || data.format !== EXPORT_FORMAT || !Array.isArray(data.profiles)) return { error: 'Ce fichier n\'est pas une sauvegarde de Pépin.' };
+  const incoming = data.profiles.map(cleanProfile).filter(Boolean);
+  if (!incoming.length) return { error: 'Aucun joueur lisible dans ce fichier.' };
+  let added = 0, replaced = 0, skipped = 0;
+  for (const p of incoming) {
+    const k = save.profiles.findIndex(x => x.id === p.id);
+    if (k >= 0) { save.profiles[k] = p; replaced++; }
+    else if (save.profiles.length < MAX_PROFILES) { save.profiles.push(p); added++; }
+    else skipped++;
+  }
+  const hof = save.hof || (save.hof = {});
+  for (const [k, list] of Object.entries(data.hof || {})) {
+    const lv = +k; if (!Number.isInteger(lv) || lv < 0 || lv >= LEVELS.length || !Array.isArray(list)) continue;
+    const ok = list.filter(e => e && typeof e.name === 'string' && /^[\p{L}\p{N} _.'-]{1,12}$/u.test(e.name) && Number.isFinite(e.score) && Number.isFinite(e.time))
+      .map(e => ({ name: e.name, score: Math.round(e.score), time: e.time, date: Number.isFinite(e.date) ? e.date : 0 }));
+    const seen = new Set();
+    hof[lv] = (hof[lv] || []).concat(ok).filter(e => { const id = `${e.name}|${e.score}|${e.time}|${e.date}`; if (seen.has(id)) return false; seen.add(id); return true; })
+      .sort((a, b) => b.score - a.score || a.time - b.time).slice(0, 5);
+  }
+  const all = loadReplays(), kept = new Set(save.profiles.map(p => p.id));
+  for (const [id, levels] of Object.entries(data.replays || {})) {
+    if (!kept.has(id) || !levels || typeof levels !== 'object') continue;
+    const mine = all[id] || (all[id] = {});
+    for (const [k, str] of Object.entries(levels)) {
+      const lv = +k; if (!Number.isInteger(lv) || lv < 0 || lv >= LEVELS.length || typeof str !== 'string' || str.length > 400000) continue;
+      const t = s => { try { const o = JSON.parse(s); return o.level === lv && Number.isFinite(o.time) ? o.time : Infinity; } catch (e) { return Infinity; } };
+      if (t(str) < t(mine[lv] || '')) mine[lv] = str;
+    }
+  }
+  storeReplays(all);
+  if (!save.profiles.some(p => p.id === save.current)) save.current = save.profiles[0].id;
+  persist();
+  return { added, replaced, skipped, names: incoming.map(p => p.name) };
+}
+/* Donne un fichier au joueur : feuille de partage du téléphone si possible (Enregistrer dans Fichiers, messagerie…), sinon téléchargement */
+async function deliverFile(blob, filename, title, text) {
+  const file = typeof File === 'function' ? new File([blob], filename, { type: blob.type }) : null;
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title, ...(text ? { text } : {}) }); return 'shared'; }
+    catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return 'downloaded';
+}
+async function exportSave() {
+  const msg = document.getElementById('saveMsg');
+  const blob = new Blob([JSON.stringify(buildExport())], { type: 'application/json' });
+  const r = await deliverFile(blob, `pepin-sauvegarde-${todayStr()}.json`, 'Sauvegarde de Pépin');
+  msg.textContent = r === 'cancelled' ? '' : 'Sauvegarde prête. Garde ce fichier en lieu sûr (Fichiers, Drive, e-mail…).';
+}
+function importSave(file) {
+  const msg = document.getElementById('saveMsg');
+  if (!file) return;
+  if (file.size > 5e6) { msg.textContent = 'Fichier trop gros pour être une sauvegarde de Pépin.'; return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    let data = null; try { data = JSON.parse(rd.result); } catch (e) {}
+    if (!data || data.format !== EXPORT_FORMAT) { msg.textContent = 'Ce fichier n\'est pas une sauvegarde de Pépin.'; return; }
+    const who = (data.profiles || []).map(p => p && p.name).filter(Boolean).join(', ');
+    if (!confirm(`Importer ${who || 'cette sauvegarde'} ? Les joueurs portant le même identifiant seront remplacés, les autres ajoutés.`)) return;
+    const r = mergeImport(data);
+    if (r.error) { msg.textContent = r.error; return; }
+    msg.textContent = `Import réussi : ${r.added} joueur(s) ajouté(s), ${r.replaced} mis à jour` + (r.skipped ? `, ${r.skipped} ignoré(s) (six joueurs au maximum)` : '') + '.';
+    SFX.power(); updateProfBtn(); updateTitleHS();
+  };
+  rd.readAsText(file);
+}
+document.getElementById('importFile').addEventListener('change', e => importSave(e.target.files && e.target.files[0]));
+
+/* =========================================================
+   Image de score à partager (1080 × 1080, réseaux et messageries)
+   ========================================================= */
+const GAME_URL = 'https://laurent-67370.github.io/pepin/';
+let lastResult = null;
+function shareText(r) {
+  const quoi = r.daily ? `le défi du jour (${r.world})` : `${r.sub} « ${r.world} »`;
+  return `J'ai terminé ${quoi} en ${fmtTime(r.time)} avec ${fmtNum(r.score)} points dans Pépin, la graine voyageuse ! ${GAME_URL}`;
+}
+function buildScoreImage(r) {
+  const W = 1080, c = document.createElement('canvas'); c.width = W; c.height = W;
+  const g = c.getContext('2d'), F = '"Pixelify Sans","Trebuchet MS",sans-serif', th = THEMES[LEVELS[r.level].theme] || TH;
+  const grad = g.createLinearGradient(0, 0, 0, W); grad.addColorStop(0, th.sky[0]); grad.addColorStop(1, th.sky[1]); g.fillStyle = grad; g.fillRect(0, 0, W, W);
+  const box = (x, y, w, h, rad, fill, line) => { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad); g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); g.fillStyle = fill; g.fill(); if (line) { g.lineWidth = 6; g.strokeStyle = line; g.stroke(); } };
+  // La dernière image du jeu : Pépin devant sa lanterne
+  const scr = document.getElementById('screen');
+  box(60, 54, 960, 540, 18, '#2a1a12');
+  if (scr && scr.width) {
+    // Recadrage 16:9 centré sur Pépin : sur un téléphone en portrait (écran presque carré), le sol et Pépin restent dans l'image
+    const sw = scr.width, sh = scr.height, A = 948 / 528, fx = clamp((P.x + 5 - cam.x) / VW, 0, 1), fy = clamp((P.y + 7 - cam.y) / VH, 0, 1);
+    let cw = sw, ch = sh; if (sw / sh > A) cw = sh * A; else ch = sw / A;
+    const cx = clamp(fx * sw - cw / 2, 0, sw - cw), cy = clamp(fy * sh - ch * 0.6, 0, sh - ch);
+    g.save(); g.imageSmoothingEnabled = false; box(66, 60, 948, 528, 14, '#000'); g.clip(); g.drawImage(scr, cx, cy, cw, ch, 66, 60, 948, 528); g.restore();
+  }
+  // Carte des résultats
+  box(60, 628, 960, 396, 22, '#fff3dc', '#2a1a12');
+  const text = (t, x, y, size, col, weight = 700, align = 'left', maxW = 600) => {
+    g.textAlign = align; g.textBaseline = 'alphabetic'; g.fillStyle = col;
+    let sz = size; do { g.font = `${weight} ${sz}px ${F}`; sz -= 2; } while (g.measureText(t).width > maxW && sz > 14);
+    g.fillText(t, x, y);
+  };
+  text('Pépin, la graine voyageuse', 100, 690, 34, '#3f8f34', 700, 'left', 640);
+  text(r.daily ? `Défi du jour · ${r.world}` : `${r.sub} · ${r.world}`, 100, 748, 46, '#2a1a12', 700, 'left', 640);
+  text(`${fmtNum(r.score)} points`, 100, 850, 92, '#2a1a12', 700, 'left', 640);
+  // Temps, médaille, graines, rosées
+  text(`Temps ${fmtTime(r.time)}`, 100, 916, 34, '#2a1a12', 600, 'left', 300);
+  if (r.assisted) text('Mode assistance', 420, 916, 30, '#7a6a5a', 600, 'left', 260);
+  else { g.beginPath(); g.arc(437, 904, 17, 0, Math.PI * 2); g.fillStyle = MEDAL_COL[r.medal]; g.fill(); g.lineWidth = 4; g.strokeStyle = '#2a1a12'; g.stroke(); text(MEDAL_NAME[r.medal], 466, 916, 34, '#2a1a12', 600, 'left', 200); }
+  text(`Graines ${r.seeds}/${r.seedsTotal} · Rosées ${r.gems}/3`, 100, 966, 30, '#5a4a44', 600, 'left', 600);
+  text(`${r.name ? r.name + ' · ' : ''}laurent-67370.github.io/pepin`, 100, 1004, 24, '#7a6a5a', 400, 'left', 620);
+  // Pépin, content, en grand à droite de la carte
+  const pep = renderPep({ t: 0, ph: 0, moving: false, air: false, vy: 0, blink: false, mood: 'happy', leafA: 0, leafS: 0.45, leafBig: false });
+  g.save(); g.imageSmoothingEnabled = false; g.drawImage(pep, 760, 690, 224, 280); g.restore();
+  return c;
+}
+async function shareScore(btn) {
+  const r = lastResult; if (!r) return;
+  // Police du jeu pour l'image ; au-delà de 1,5 s (hors ligne, réseau lent), on dessine avec la police de secours
+  try { if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('700 40px "Pixelify Sans"'), new Promise(ok => setTimeout(ok, 1500))]); } catch (e) {}
+  const c = buildScoreImage(r), txt = shareText(r);
+  const blob = await new Promise(ok => c.toBlob(ok, 'image/png'));
+  if (!blob) return;
+  const res = await deliverFile(blob, `pepin-${(r.daily ? 'defi-' : 'monde-') + (r.level + 1)}.png`, 'Pépin, la graine voyageuse', txt);
+  if (res === 'downloaded') {
+    try { await navigator.clipboard.writeText(txt); } catch (e) {}
+    if (btn) { btn.textContent = 'Image téléchargée, texte copié'; setTimeout(() => { btn.textContent = 'Partager mon score'; }, 3000); }
+  }
 }
 
 /* Réglages */

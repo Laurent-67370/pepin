@@ -28,6 +28,8 @@ jobs:
         run: node --test tests/fantome.test.js
       - name: Vérification des parties par le serveur
         run: node --test tests/verif.test.js
+      - name: Sauvegarde (export, import) et partage du score
+        run: node --test tests/sauvegarde.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes

@@ -40,7 +40,7 @@ function creerMoteur({ alea = Math.random, reglages = {}, html } = {}) {
   const g = {
     console, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: () => 0, cancelAnimationFrame() {}, queueMicrotask() {},
-    performance: { now: () => 0 }, crypto: globalThis.crypto || require('crypto').webcrypto /* global seulement depuis Node 19 */, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, btoa, atob,
+    performance: { now: () => 0 }, crypto: globalThis.crypto || require('crypto').webcrypto /* global seulement depuis Node 19 */, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, btoa, atob, Blob, File: globalThis.File,
     fetch: () => new Promise(() => {}), innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1,
     localStorage: { getItem: k => (stockage.has(k) ? stockage.get(k) : null), setItem: (k, v) => stockage.set(k, String(v)), removeItem: k => stockage.delete(k) },
     document: inerte(), navigator: inerte(), location: inerte(), history: inerte(), screen: inerte(),

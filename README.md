@@ -13,6 +13,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - Mode assistance (vitesse réduite, invincibilité, double saut), mode classique avec vies limitées, qualité graphique automatique
 - Tactile : joystick flottant, saut sur toute la moitié droite, bouton Élan
 - Bouton « Revoir la partie » en fin de monde, et fantôme du meilleur temps qui court à côté de Pépin (désactivable dans les réglages)
+- Partage d'une image de score en fin de monde ; export et import de la progression (Réglages > Sauvegarde) pour changer d'appareil
 - Clavier : flèches ou ZQSD, Espace pour sauter, X ou Maj pour l'Élan, Échap pour la pause
 
 ## Installer
@@ -27,6 +28,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - `node --test tests/rejeu.test.js` enregistre des parties, les rejoue sur un autre « appareil » et vérifie qu'elles retombent exactement sur le même état.
 - `node --test tests/fantome.test.js` vérifie la trajectoire du fantôme, son rythme, et qu'il n'influence jamais la partie.
 - `node --test tests/verif.test.js` vérifie que le serveur valide une partie honnête et repère score, temps, entrées, assistance ou graine du défi falsifiés.
+- `node --test tests/sauvegarde.test.js` teste l'export et l'import de la sauvegarde (fusion, fichiers piégés) et le partage du score.
 
 Ces vérifications tournent automatiquement sur GitHub Actions à chaque push.
 
