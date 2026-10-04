@@ -1,5 +1,7 @@
 # Pépin, la graine voyageuse 🌱
 
+[![Vérifications](https://github.com/Laurent-67370/pepin/actions/workflows/verifications.yml/badge.svg)](https://github.com/Laurent-67370/pepin/actions/workflows/verifications.yml)
+
 Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manette. Installable comme une application (PWA) et jouable hors ligne.
 
 **Jouer : https://laurent-67370.github.io/pepin/**
@@ -16,7 +18,11 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - Android (Chrome) : bouton « Installer le jeu sur cet appareil » dans le menu.
 - iPhone (Safari) : bouton Partager, puis « Sur l'écran d'accueil ».
 
-## Vérifier les niveaux
-`node tools/verifier-niveaux.js [numéro de monde]` rejoue la physique du saut et signale toute arrivée, graine, goutte ou caisse inaccessible.
+## Vérifier
+- `node tools/verifier-niveaux.js [numéro de monde]` rejoue la physique du saut et signale toute arrivée, graine, goutte ou caisse inaccessible.
+- `node tools/verifier-coherence.js` contrôle que `APP_VERSION` (index.html) et `VERSION` (sw.js) correspondent, et que le jeu et le serveur tirent le même monde du jour.
+- `node --test tests/serveur.test.js` teste le serveur de classement (validation, défi du jour, anti-abus, sauvegarde, purge).
+
+Ces trois vérifications tournent automatiquement sur GitHub Actions à chaque push.
 
 Pixel art procédural et musiques Web Audio, tout est généré par code. La progression est enregistrée dans le navigateur.

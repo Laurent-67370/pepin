@@ -106,7 +106,10 @@ function check(i) {
   const miss = []; L.seeds.forEach((s, j) => { if (!hitItems.has('s' + j)) miss.push('graine ' + s.tx + ',' + s.ty); });
   L.gems.forEach((s, j) => { if (!hitItems.has('g' + j) && !s.boss) miss.push('ROSÉE ' + s.tx + ',' + s.ty); });
   const crMiss = L.crates.filter(c => !broken.has(c.ty * 1000 + c.tx)).map(c => 'caisse ' + c.tx + ',' + c.ty);
+  if (!goal || miss.length || crMiss.length) echecs++;
   console.log(`${i + 1}. ${L.def.name}: arrivée ${goal ? 'OK' : 'INACCESSIBLE'} | ${L.seeds.length - miss.filter(m => m.startsWith('graine')).length}/${L.seeds.length} graines | positions ${seen.size}` + (miss.length || crMiss.length ? '\n   manquants: ' + miss.concat(crMiss).join(' ; ') : ''));
 }
 const NO_DASH = process.argv.includes('--sans-elan');
+let echecs = 0; // nombre de mondes en défaut : code de sortie 1 pour la vérification automatique
 const only = process.argv.find((x, i) => i > 1 && /^\d+$/.test(x)) != null ? +process.argv.find((x, i) => i > 1 && /^\d+$/.test(x)) - 1 : null; for (let i = 0; i < LEVELS.length; i++) if (only == null || only === i) check(i);
+if (echecs) { console.error(`\n${echecs} monde(s) en défaut`); process.exitCode = 1; }
