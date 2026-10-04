@@ -23,6 +23,9 @@ function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, FILE); }, 200);
 }
+function flushSync() { clearTimeout(saveTimer); const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, FILE); }
+process.on('SIGTERM', () => { try { flushSync(); } catch (e) {} process.exit(0); });
+process.on('SIGINT', () => { try { flushSync(); } catch (e) {} process.exit(0); });
 const hits = new Map();
 function limited(ip) {
   const now = Date.now(), h = (hits.get(ip) || []).filter(t => now - t < 60000);

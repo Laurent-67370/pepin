@@ -2748,6 +2748,7 @@ function showResults() {
     document.getElementById('rSub').textContent = 'Rejoue autant que tu veux, ton meilleur score du jour compte.';
   }
   if (!assisted) {
+    const needName = save.settings.online && (!save.playerName || save.playerName === 'Joueur 1');
     const secsR = Math.round(stats.time / 6) / 10, box = document.createElement('div'); box.className = 'recBox';
     const lines = [];
     if (counts && hofQualifies(i, total)) { const rank = hofInsert(i, { name: save.playerName, score: total, time: secsR, date: Date.now() }); lines.push(`Top 5 de cet appareil : <b>${ord(rank)} place</b> pour ${esc(save.playerName)}.`); }
@@ -2755,11 +2756,35 @@ function showResults() {
     if (dailyRun) { const d = dailyRun, best = Math.max(save.daily[d] || 0, total), nb = total > (save.daily[d] || 0); save.daily[d] = best; dayLine = lines.length; lines.push(`Défi du jour : ${nb ? '<b>nouveau meilleur score</b>' : 'meilleur score ' + fmtNum(best)}.`); }
     persist();
     const onl = lines.length; if (save.settings.online && (newHS || dailyRun)) lines.push('Envoi au classement en ligne…');
+    const sendAll = () => {
+      if (counts && newHS) submitOnline(i, total, secsR, r => { lines[onl] = r ? `Classement en ligne du monde : <b>${ord(r.rank)}</b> sur ${r.total}.` : 'Classement en ligne indisponible, ton record reste enregistré ici.'; draw(); });
+      if (dailyRun && total >= (save.daily[dailyRun] || 0)) submitOnline(i, total, secsR, r => { lines[dayLine] += r ? ` Classement du jour : <b>${ord(r.rank)}</b> sur ${r.total}.` : ''; if (!(counts && newHS)) lines[onl] = ''; draw(); }, dailyRun);
+      else if (dailyRun && !(counts && newHS)) { lines.length = onl; draw(); }
+    };
     const draw = () => { box.innerHTML = lines.join('<br>'); if (lines.length) document.getElementById('rStats').prepend(box); };
     draw();
-    if (counts && newHS) submitOnline(i, total, secsR, r => { lines[onl] = r ? `Classement en ligne du monde : <b>${ord(r.rank)}</b> sur ${r.total}.` : 'Classement en ligne indisponible, ton record reste enregistré ici.'; draw(); });
-    if (dailyRun && total >= (save.daily[dailyRun] || 0)) submitOnline(i, total, secsR, r => { lines[dayLine] += r ? ` Classement du jour : <b>${ord(r.rank)}</b> sur ${r.total}.` : ''; if (!(counts && newHS)) lines[onl] = ''; draw(); }, dailyRun);
-    else if (dailyRun && !(counts && newHS)) { lines.length = onl; draw(); }
+    if (needName) {
+      // Premier envoi en ligne : demander le prénom d'abord (le défaut « Joueur 1 » part en ligne sous ce nom).
+      const fname = document.createElement('div'); fname.className = 'nameForm';
+      fname.innerHTML = `<label for="nameIn">Ton prénom pour le classement en ligne :</label><div class="row2"><input id="nameIn" maxlength="12" autocomplete="nickname" enterkeyhint="done" placeholder="Prénom"><button class="btn primary" id="nameOk2">Enregistrer</button></div><p id="nameMsg2"></p>`;
+      box.parentNode.insertBefore(fname, box);
+      const inp = fname.querySelector('#nameIn'), msg2 = fname.querySelector('#nameMsg2');
+      inp.focus();
+      const ok2 = () => {
+        const name = inp.value.trim();
+        if (!/^[\p{L}\p{N} _.'-]{2,12}$/u.test(name)) { msg2.textContent = 'De 2 à 12 lettres ou chiffres, s\'il te plaît.'; inp.focus(); return; }
+        save.playerName = name; persist(); SFX.gem();
+        // Mettre à jour le top local déjà affiché (il montrait « Joueur 1 ») :
+        if (counts && hofQualifies(i, total)) { const rank = hofInsert(i, { name, score: total, time: secsR, date: Date.now() }); lines[0] = `Top 5 de cet appareil : <b>${ord(rank)} place</b> pour ${esc(name)}.`; }
+        fname.remove();
+        lines[onl] = 'Envoi au classement en ligne…'; draw();
+        sendAll();
+      };
+      fname.querySelector('#nameOk2').onclick = ok2;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok2(); } });
+      return;
+    }
+    sendAll();
   }
 }
 function toggleFullscreen() {
@@ -2798,7 +2823,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
