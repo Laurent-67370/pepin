@@ -1,9 +1,9 @@
 /* Serveur de classement en ligne de Pépin.
    Node.js 18+, aucune dépendance. Données dans un fichier JSON (écriture atomique).
-   Variables d'environnement : PORT (3210), DATA_DIR (./data), ALLOW_ORIGINS (liste séparée par des virgules). */
+   Variables d'environnement : PORT (3215), DATA_DIR (./data), ALLOW_ORIGINS (liste séparée par des virgules). */
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path');
-const PORT = +process.env.PORT || 3210;
+const PORT = +process.env.PORT || 3215;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const FILE = path.join(DATA_DIR, 'scores.json');
 const ORIGINS = (process.env.ALLOW_ORIGINS || 'https://laurent-67370.github.io,https://pepin.lhusser.fr').split(',').map(s => s.trim());
