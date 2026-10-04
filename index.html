@@ -164,6 +164,17 @@ body.has-touch.playing #touch{display:block;}
 .stats{margin:14px 0 18px;font-size:19px;}
 .stats div{display:flex;justify-content:space-between;padding:7px 0;border-bottom:2px dashed rgba(122,90,68,.35);}
 .stats div:last-child{border-bottom:0;}
+.btn.chip{display:inline-flex;align-items:center;gap:10px;font-size:17px;padding:6px 14px 6px 8px;margin:-6px 0 14px;}
+.avatar{display:inline-block;width:26px;height:26px;border-radius:50%;border:3px solid var(--bark);flex:0 0 auto;}
+.profRow{display:flex;gap:8px;align-items:stretch;}
+.profRow .btn.sel{flex:1;display:flex;align-items:center;gap:10px;}
+.profRow .btn.sel small{display:block;font-size:13px;font-weight:400;color:var(--muted);}
+.profRow .btn.sel.cur{background:var(--amber);color:#2a1a12;}
+.profRow .btn.sel.cur small{color:#5a3a1a;}
+.profRow .btn.mini{flex:0 0 auto;font-size:15px;padding:6px 10px;}
+.dailyCard{background:var(--paper-2);border:3px solid var(--bark);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+.dailyCard strong{font-size:22px;display:block;}
+.recBox{background:rgba(95,174,62,.14);border:2px solid var(--leaf);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:16px;line-height:1.4;display:block!important;}
 .tabs{display:flex;gap:8px;margin:4px 0 6px;}
 .tab{flex:1;font-family:var(--font);font-size:17px;font-weight:600;padding:8px;border:3px solid var(--bark);border-radius:8px;background:var(--paper-2);color:var(--text);cursor:pointer;}
 .tab.on{background:var(--amber);color:#2a1a12;}
@@ -213,10 +224,12 @@ body.has-touch.playing #touch{display:block;}
     <section id="pTitle" class="panel">
       <h1>Pépin</h1>
       <p class="tag">La graine voyageuse rallume les lanternes de la forêt.</p>
+      <button class="btn chip" data-act="profiles" id="profBtn"></button>
       <p class="hs" id="hsTotal" hidden></p>
       <div class="stack">
         <button class="btn primary" data-act="play">Jouer</button>
         <button class="btn" data-act="levels">Carte du monde</button>
+        <button class="btn" data-act="daily" id="dailyBtn">Défi du jour</button>
         <button class="btn" data-act="scores">Meilleurs scores</button>
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="quit">Quitter le jeu</button>
@@ -281,6 +294,21 @@ body.has-touch.playing #touch{display:block;}
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
     </section>
 
+    <section id="pProfiles" class="panel">
+      <h2>Joueurs</h2>
+      <p class="sub">Chaque joueur a sa progression, ses médailles et ses records.</p>
+      <div class="stack" id="profList"></div>
+      <div class="nameForm" style="margin-top:14px"><label for="newProf">Ajouter un joueur</label><div class="row2"><input id="newProf" maxlength="12" placeholder="Prénom" autocomplete="off"><button class="btn primary" id="addProf">Ajouter</button></div><p id="profMsg"></p></div>
+      <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
+    </section>
+
+    <section id="pDaily" class="panel">
+      <h2>Défi du jour</h2>
+      <p class="sub">Un monde tiré au sort chaque jour, le même pour tous les joueurs. Rejoue autant que tu veux : ton meilleur score du jour compte.</p>
+      <div id="dailyInfo"></div>
+      <div class="stack" style="margin-top:14px"><button class="btn primary" data-act="dailyGo">Relever le défi</button><button class="btn" data-act="back">Retour</button></div>
+    </section>
+
     <section id="pBye" class="panel">
       <h2>À bientôt !</h2>
       <p class="sub" id="byeTxt">Ta progression est enregistrée.</p>
@@ -313,7 +341,17 @@ try {
   if (s) save = { ...save, ...s, settings: { ...save.settings, ...(s.settings || {}) } };
 } catch (e) {}
 if (!save.hof) save.hof = {};
-if (!save.deviceId) save.deviceId = (crypto.randomUUID ? crypto.randomUUID() : Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
+const newUid = () => (crypto.randomUUID ? crypto.randomUUID() : Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
+/* Profils de joueurs : progression, médailles, records et défis séparés. Le top 5 avec prénom reste commun à l'appareil. */
+if (!save.profiles || !save.profiles.length) {
+  save.profiles = [{ id: newUid(), name: save.playerName || 'Joueur 1', color: 0, unlocked: save.unlocked || 1, best: save.best || {}, uid: save.deviceId || newUid(), daily: {} }];
+  save.current = save.profiles[0].id;
+}
+for (const k of ['unlocked', 'best', 'playerName', 'deviceId']) delete save[k];
+const prof = () => save.profiles.find(p => p.id === save.current) || save.profiles[0];
+for (const [k, pk] of [['unlocked', 'unlocked'], ['best', 'best'], ['daily', 'daily'], ['playerName', 'name'], ['deviceId', 'uid']])
+  Object.defineProperty(save, k, { get: () => prof()[pk], set: v => { prof()[pk] = v; }, enumerable: false, configurable: true });
+for (const p of save.profiles) { if (!p.daily) p.daily = {}; if (!p.best) p.best = {}; if (!p.unlocked) p.unlocked = 1; if (!p.uid) p.uid = newUid(); }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -2452,7 +2490,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', layout);
    Menus et écrans
    ========================================================= */
 const overlay = document.getElementById('overlay');
-const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores' };
+const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores', profiles: 'pProfiles', daily: 'pDaily' };
 let panelStack = [];
 function showPanel(name, push = true) {
   releaseAllTouch();
@@ -2526,8 +2564,45 @@ function showMapInfo(i, locked) {
   el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>${line}<br>Or ${fmtSec(m[0])} · Argent ${fmtSec(m[1])} · Bronze ${fmtSec(m[2])}</div>`;
   const b = document.createElement('button'); b.className = 'btn primary'; b.textContent = 'Jouer'; b.onclick = () => { SFX.click(); startLevel(i); }; el.appendChild(b);
 }
+const AV_COL = ['#f0a03a', '#5fae3e', '#5fd0ec', '#e0607e', '#9060e0', '#ffcf3a'];
+const ord = n => n === 1 ? '1re' : n + 'e';
+function updateProfBtn() { const p = prof(); document.getElementById('profBtn').innerHTML = `<span class="avatar" style="background:${AV_COL[p.color % 6]}"></span>Joueur : ${esc(p.name)}`; }
+function renderProfiles() {
+  const box = document.getElementById('profList'); box.innerHTML = '';
+  save.profiles.forEach(p => {
+    const tot = Object.values(p.best).reduce((a, b) => a + (b && b.score || 0), 0);
+    const row = document.createElement('div'); row.className = 'profRow';
+    row.innerHTML = `<button class="btn sel${p.id === save.current ? ' cur' : ''}"><span class="avatar" style="background:${AV_COL[p.color % 6]}"></span><span>${esc(p.name)}<small>Monde ${Math.min(p.unlocked, LEVELS.length)} · ${fmtNum(tot)} points</small></span></button><button class="btn mini" data-k="ren" aria-label="Renommer ${esc(p.name)}">✎</button>${save.profiles.length > 1 ? `<button class="btn mini" data-k="del" aria-label="Supprimer ${esc(p.name)}">✕</button>` : ''}`;
+    row.querySelector('.sel').onclick = () => { SFX.click(); save.current = p.id; persist(); renderProfiles(); updateProfBtn(); updateTitleHS(); };
+    row.querySelector('[data-k=ren]').onclick = () => { const n = (prompt('Nouveau prénom', p.name) || '').trim(); if (/^[\p{L}\p{N} _.'-]{2,12}$/u.test(n)) { p.name = n; persist(); renderProfiles(); updateProfBtn(); } };
+    const del = row.querySelector('[data-k=del]');
+    if (del) del.onclick = () => { if (!confirm(`Supprimer ${p.name} et toute sa progression ?`)) return; save.profiles = save.profiles.filter(x => x !== p); if (save.current === p.id) save.current = save.profiles[0].id; persist(); renderProfiles(); updateProfBtn(); updateTitleHS(); };
+    box.appendChild(row);
+  });
+}
+document.getElementById('addProf').onclick = () => {
+  const inp = document.getElementById('newProf'), msg = document.getElementById('profMsg'), n = inp.value.trim();
+  if (!/^[\p{L}\p{N} _.'-]{2,12}$/u.test(n)) { msg.textContent = 'De 2 à 12 lettres ou chiffres.'; return; }
+  if (save.profiles.length >= 6) { msg.textContent = 'Six joueurs au maximum.'; return; }
+  const p = { id: newUid(), name: n, color: save.profiles.length, unlocked: 1, best: {}, uid: newUid(), daily: {} };
+  save.profiles.push(p); save.current = p.id; persist(); inp.value = ''; msg.textContent = `${n} est prêt à jouer !`; SFX.power(); renderProfiles(); updateProfBtn(); updateTitleHS();
+};
+document.getElementById('newProf').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addProf').click(); } });
+const todayStr = () => new Date().toISOString().slice(0, 10);
+function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % LEVELS.length; }
+let dailyRun = null;
+function updateDailyBtn() { document.getElementById('dailyBtn').textContent = `Défi du jour : ${LEVELS[dailyWorld(todayStr())].name}`; }
+function renderDaily() {
+  const day = todayStr(), w = dailyWorld(day), mine = save.daily[day] || 0, box = document.getElementById('dailyInfo');
+  box.innerHTML = `<div class="dailyCard"><small>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</small><strong>${LEVELS[w].sub} : ${LEVELS[w].name}</strong>${mine ? `Ton meilleur score du jour : <b>${fmtNum(mine)}</b>` : 'Tu n\'as pas encore relevé le défi aujourd\'hui.'}</div><div id="dailyTop"><p class="hint">${save.settings.online ? 'Chargement du classement du jour…' : 'Classement en ligne désactivé dans les Réglages.'}</p></div>`;
+  if (!save.settings.online) return;
+  fetch(`${SCORE_API}?daily=${day}`).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+    const me = save.deviceId.slice(0, 8), el = document.getElementById('dailyTop'); if (!el) return;
+    el.innerHTML = d.top.length ? d.top.map(e => `<div class="scoreRow${e.device === me ? ' me' : ''}"><span><span class="rk">${e.rank}.</span>${esc(e.name)}<small>${fmtTime(e.time * 60)}${e.device === me ? ' · toi' : ''}</small></span><strong>${fmtNum(e.score)}</strong></div>`).join('') : '<p class="hint">Personne n\'a encore relevé le défi aujourd\'hui. Sois le premier !</p>';
+  }).catch(() => { const el = document.getElementById('dailyTop'); if (el) el.innerHTML = '<p class="hint">Classement en ligne indisponible pour le moment.</p>'; });
+}
 const totalHS = () => Object.values(save.best).reduce((a, b) => a + (b && b.score || 0), 0);
-function updateTitleHS() { const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
+function updateTitleHS() { updateProfBtn(); updateDailyBtn(); const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
 const SCORE_API = window.PEPIN_API || 'https://pepin-api.lhusser.fr/api/scores';
 let scoreTab = 'local', scoreLevel = 'total';
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2566,9 +2641,9 @@ function renderScores() {
       : '<p class="hint">Personne n\'a encore enregistré de score ici. À toi de jouer !</p>';
   }).catch(() => { if (want === scoreLevel && scoreTab === 'online') box.innerHTML = '<p class="hint">Classement en ligne indisponible pour le moment (pas de réseau, ou serveur pas encore installé).</p>'; });
 }
-function submitOnline(level, score, time, cb) {
+function submitOnline(level, score, time, cb, day) {
   if (!save.settings.online || !save.playerName) { cb && cb(null); return; }
-  fetch(SCORE_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, score, time, name: save.playerName, device: save.deviceId, v: APP_VERSION }) })
+  fetch(SCORE_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, score, time, name: save.playerName, device: save.deviceId, v: APP_VERSION, ...(day ? { day } : {}) }) })
     .then(r => r.json()).then(d => cb && cb(d && d.ok ? d : null)).catch(() => cb && cb(null));
 }
 function hofQualifies(level, score) { const l = save.hof[level] || []; return score > 0 && (l.length < 5 || score > l[l.length - 1].score); }
@@ -2601,7 +2676,8 @@ function renderLevelList() {
     list.appendChild(b);
   });
 }
-function startLevel(i) {
+function startLevel(i, daily) {
+  dailyRun = daily ? todayStr() : null;
   armBack(); AU.init(); loadLevel(i); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
 }
 function goMenu() {
@@ -2611,15 +2687,15 @@ function goMenu() {
 function openPause() {
   if (state !== 'play') return;
   state = 'pause'; stopSong(); releaseAllTouch();
-  document.getElementById('pauseInfo').textContent = `${L.def.sub} : ${L.def.name}. ${stats.seeds}/${stats.seedsTotal} graines, ${fmtTime(stats.time)}.`;
+  document.getElementById('pauseInfo').textContent = `${dailyRun ? 'Défi du jour · ' : ''}${L.def.sub} : ${L.def.name}. ${stats.seeds}/${stats.seedsTotal} graines, ${fmtTime(stats.time)}.`;
   panelStack = []; showPanel('pause');
 }
 function resumeGame() { state = 'play'; hidePanels(); playSong(L.def.song); layoutTouch(); }
 function showResults() {
   state = 'results';
-  const i = levelIdx, prev = save.best[i];
+  const i = levelIdx, prev = save.best[i], keepBest = prev ? JSON.parse(JSON.stringify(prev)) : null, keepUnl = save.unlocked, counts = !dailyRun || i < save.unlocked;
   const gemsN = stats.gems.filter(Boolean).length;
-  const isRecord = (!prev || stats.time < prev.time) && !(assistOn() || stats.assistUsed);
+  const isRecord = counts && (!prev || stats.time < prev.time) && !(assistOn() || stats.assistUsed);
   save.best[i] = {
     time: prev ? Math.min(prev.time, stats.time) : stats.time,
     seeds: prev ? Math.max(prev.seeds, stats.seeds) : stats.seeds,
@@ -2631,7 +2707,7 @@ function showResults() {
   const secs = stats.time / 60, bTime = Math.max(0, Math.round(medalTimes(i)[2] - secs)) * 50;
   const bHearts = P.hearts * 300, bNoFall = stats.deaths === 0 ? 1000 : 0, bSeeds = stats.seeds >= stats.seedsTotal ? 2000 : 0, bGems = gemsN === 3 ? 1000 : 0;
   const total = stats.score + bTime + bHearts + bNoFall + bSeeds + bGems;
-  const prevHS = prev && prev.score || 0, newHS = !assisted && total > prevHS;
+  const prevHS = prev && prev.score || 0, newHS = !assisted && counts && total > prevHS;
   save.best[i].score = Math.max(prevHS, assisted ? 0 : total);
   if (assisted && prev) save.best[i].time = prev.time; else if (assisted) save.best[i].time = 359999;
   if (medal > save.best[i].medal) save.best[i].medal = medal;
@@ -2655,7 +2731,7 @@ function showResults() {
     (bSeeds ? `<div class="sc"><span>Toutes les graines</span><strong>${fmtNum(bSeeds)}</strong></div>` : '') +
     (bGems ? `<div class="sc"><span>Toutes les rosées</span><strong>${fmtNum(bGems)}</strong></div>` : '') +
     `<div class="total"><span>Score</span><strong>${fmtNum(total)}${newHS ? '<span class="badge">Nouveau record</span>' : ''}</strong></div>` +
-    (assisted ? `<div><span>Record</span><strong style="font-size:15px">Hors classement (assistance)</strong></div>` : `<div><span>Meilleur score</span><strong>${fmtNum(Math.max(prevHS, total))}</strong></div>`);
+    (assisted ? `<div><span>Record</span><strong style="font-size:15px">Hors classement (assistance)</strong></div>` : counts ? `<div><span>Meilleur score</span><strong>${fmtNum(Math.max(prevHS, total))}</strong></div>` : '');
   const btns = document.getElementById('rButtons'); btns.innerHTML = '';
   const add = (label, fn, primary) => { const b = document.createElement('button'); b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = () => { SFX.click(); fn(); }; btns.appendChild(b); };
   if (!last) add('Monde suivant', () => startLevel(i + 1), true);
@@ -2663,10 +2739,27 @@ function showResults() {
   add('Retour au menu', goMenu);
   panelStack = []; showPanel('results');
   playSong(3);
+  if (!counts) { if (keepBest) save.best[i] = keepBest; else delete save.best[i]; save.unlocked = keepUnl; persist(); }
+  if (dailyRun) {
+    const b = document.getElementById('rButtons'); b.innerHTML = '';
+    const add = (label, fn, primary) => { const x = document.createElement('button'); x.className = 'btn' + (primary ? ' primary' : ''); x.textContent = label; x.onclick = () => { SFX.click(); fn(); }; b.appendChild(x); };
+    add('Rejouer le défi', () => startLevel(i, true), true); add('Retour au menu', goMenu);
+    document.getElementById('rTitle').textContent = 'Défi du jour : ' + L.def.name;
+    document.getElementById('rSub').textContent = 'Rejoue autant que tu veux, ton meilleur score du jour compte.';
+  }
   if (!assisted) {
-    const secsR = Math.round(stats.time / 6) / 10;
-    if (hofQualifies(i, total)) nameForm(i, total, secsR);
-    else if (newHS && save.playerName) submitOnline(i, total, secsR);
+    const secsR = Math.round(stats.time / 6) / 10, box = document.createElement('div'); box.className = 'recBox';
+    const lines = [];
+    if (counts && hofQualifies(i, total)) { const rank = hofInsert(i, { name: save.playerName, score: total, time: secsR, date: Date.now() }); lines.push(`Top 5 de cet appareil : <b>${ord(rank)} place</b> pour ${esc(save.playerName)}.`); }
+    let dayLine = null;
+    if (dailyRun) { const d = dailyRun, best = Math.max(save.daily[d] || 0, total), nb = total > (save.daily[d] || 0); save.daily[d] = best; dayLine = lines.length; lines.push(`Défi du jour : ${nb ? '<b>nouveau meilleur score</b>' : 'meilleur score ' + fmtNum(best)}.`); }
+    persist();
+    const onl = lines.length; if (save.settings.online && (newHS || dailyRun)) lines.push('Envoi au classement en ligne…');
+    const draw = () => { box.innerHTML = lines.join('<br>'); if (lines.length) document.getElementById('rStats').prepend(box); };
+    draw();
+    if (counts && newHS) submitOnline(i, total, secsR, r => { lines[onl] = r ? `Classement en ligne du monde : <b>${ord(r.rank)}</b> sur ${r.total}.` : 'Classement en ligne indisponible, ton record reste enregistré ici.'; draw(); });
+    if (dailyRun && total >= (save.daily[dailyRun] || 0)) submitOnline(i, total, secsR, r => { lines[dayLine] += r ? ` Classement du jour : <b>${ord(r.rank)}</b> sur ${r.total}.` : ''; if (!(counts && newHS)) lines[onl] = ''; draw(); }, dailyRun);
+    else if (dailyRun && !(counts && newHS)) { lines.length = onl; draw(); }
   }
 }
 function toggleFullscreen() {
@@ -2687,10 +2780,13 @@ overlay.addEventListener('click', e => {
   else if (a === 'settings') { fillSettings(); showPanel('settings'); }
   else if (a === 'back') back();
   else if (a === 'resume') resumeGame();
-  else if (a === 'restart') startLevel(levelIdx);
+  else if (a === 'restart') startLevel(levelIdx, !!dailyRun);
   else if (a === 'menu') goMenu();
   else if (a === 'quit') quitGame();
   else if (a === 'scores') { renderScores(); showPanel('scores'); }
+  else if (a === 'profiles') { renderProfiles(); showPanel('profiles'); }
+  else if (a === 'daily') { renderDaily(); showPanel('daily'); }
+  else if (a === 'dailyGo') startLevel(dailyWorld(todayStr()), true);
   else if (a === 'fullscreen') toggleFullscreen();
   else if (a === 'install') installApp();
 });
@@ -2702,7 +2798,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
