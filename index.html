@@ -68,6 +68,15 @@ body.playing #pauseBtn{display:flex;}
 /* Commandes tactiles */
 #replayTag{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:6;background:rgba(20,12,22,.72);color:#fff;font-size:14px;padding:4px 12px;border-radius:999px;pointer-events:none;letter-spacing:.02em;}
 #replayTag[hidden]{display:none;}
+#achToast{position:fixed;left:50%;top:calc(46px + env(safe-area-inset-top,0px));transform:translate(-50%,-14px);z-index:30;opacity:0;pointer-events:none;
+  background:#fff3dc;color:#2a1a12;border:3px solid #2a1a12;border-radius:10px;padding:6px 14px;font-size:17px;box-shadow:0 4px 0 rgba(0,0,0,.25);transition:opacity .3s,transform .3s;max-width:90vw;}
+#achToast.show{opacity:1;transform:translate(-50%,0);}
+#achToast b{color:#d08a00;margin-right:6px;}
+.achList{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;text-align:left;}
+.ach{display:flex;gap:10px;align-items:center;padding:6px 8px;border:2px solid var(--bark);border-radius:8px;background:var(--paper-2);opacity:.72;}
+.ach.got{opacity:1;}
+.ach small{display:block;font-size:13px;color:var(--muted);}
+.achIco{font-size:24px;width:28px;text-align:center;color:#d08a00;}
 #touch{position:fixed;inset:0;z-index:5;display:none;--cs:1;--co:.6;touch-action:none;}
 body.has-touch.playing #touch{display:block;}
 #stickBase{
@@ -216,6 +225,7 @@ body.has-touch.playing #touch{display:block;}
 <div id="app">
   <canvas id="screen" aria-label="Jeu Pépin"></canvas>
   <div id="replayTag" hidden>Rejeu · Pause pour quitter</div>
+  <div id="achToast" role="status" aria-live="polite"></div>
   <button id="pauseBtn" aria-label="Mettre en pause"><span></span><span></span></button>
 
   <div id="touch" aria-hidden="true">
@@ -235,6 +245,7 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn" data-act="levels">Carte du monde</button>
         <button class="btn" data-act="daily" id="dailyBtn">Défi du jour</button>
         <button class="btn" data-act="scores">Meilleurs scores</button>
+        <button class="btn" data-act="ach" id="achBtn">Succès</button>
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="quit">Quitter le jeu</button>
         <button class="btn" data-act="install" id="btnInstall" hidden>Installer le jeu sur cet appareil</button>
@@ -309,6 +320,12 @@ body.has-touch.playing #touch{display:block;}
       <p class="sub">Chaque joueur a sa progression, ses médailles et ses records.</p>
       <div class="stack" id="profList"></div>
       <div class="nameForm" style="margin-top:14px"><label for="newProf">Ajouter un joueur</label><div class="row2"><input id="newProf" maxlength="12" placeholder="Prénom" autocomplete="off"><button class="btn primary" id="addProf">Ajouter</button></div><p id="profMsg"></p></div>
+      <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
+    </section>
+
+    <section id="pAch" class="panel">
+      <h2>Succès</h2>
+      <div id="achBox"></div>
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
     </section>
 
@@ -1307,7 +1324,7 @@ function loadLevel(i, seed, forced) {
   TH = THEMES[def.theme]; TILES = buildTiles(TH); skyCache = null;
   L = { def, w: def.w, g: b.g, ceil: !!def.ceil };
   enemies = []; items = []; movers = []; springs = []; checkpoints = []; particles = []; ghosts = []; texts = []; goal = null;
-  let seeds = 0, gemIdx = 0; boss = null; shots = []; L.lock = null;
+  let seeds = 0, crates = 0, gemIdx = 0; boss = null; shots = []; L.lock = null;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < L.w; x++) {
     const c = L.g[y][x]; let clear = true;
     if (c === 'P') { P.x = x * T + 3; P.y = y * T + 2; }
@@ -1328,7 +1345,7 @@ function loadLevel(i, seed, forced) {
     else if (c === 'B') boss = { x: x * T, y: y * T, hx: x * T, hy: 40, w: 22, h: 16, hp: def.bossHp || 3, max: def.bossHp || 3, kind: def.bossKind || 'hornet', name: def.bossName || 'Le Grand Frelon', st: 'wait', t: 0, vy: 0, vx: 0, face: -1, inv: 0, rot: 0, alt: false };
     else clear = false;
     if (clear) L.g[y][x] = '.';
-    if (c === 'C') seeds++;
+    if (c === 'C') { seeds++; crates++; }
   }
   signs = (def.signs || []).map(([sx, txt]) => { let sy = 0; for (let y = 0; y < ROWS; y++) { if (isSolid(L.g[y][sx]) || L.g[y][sx] === '-') { sy = y; break; } } return { x: sx * T, y: sy * T - 14, txt }; });
   respawnPt = { x: P.x, y: P.y };
@@ -1339,7 +1356,7 @@ function loadLevel(i, seed, forced) {
     if (e.skin === 'penguin') e.vx = -0.7; else if (e.skin === 'scorpion') e.vx = -0.55; else if (e.skin === 'frog') { e.vx = 0; e.t = (e.x * 3) % 90; }
     if (e.type === 'w') { e.hx = e.x0; e.hy = e.y0; e.st = 'idle'; e.cd = 0; }
   }
-  stats = { score: 0, combo: 0, seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: forced ? !!forced.classic : !!save.settings.classic, lives: 3, nextLife: 25 };
+  stats = { score: 0, combo: 0, seeds: 0, seedsTotal: seeds, kills: 0, hurts: 0, crates: 0, cratesTotal: crates, gems: [false, false, false], time: 0, deaths: 0, classic: forced ? !!forced.classic : !!save.settings.classic, lives: 3, nextLife: 25 };
   cam.x = clamp(P.x - VW / 2, 0, L.w * T - VW); cam.y = clamp(P.y - VH * 0.55, minCamY(), maxCamY());
   crumbles = new Map(); irisT = 34; wind.active = wind.warn = false;
   introT = 170; bossIntroT = 0; clearT = 0; fadeT = 0; shake = 0;
@@ -1390,6 +1407,7 @@ function breakCrate(tx, ty) {
   L.g[ty][tx] = '.';
   for (let i = 0; i < 12; i++) particles.push({ x: tx * T + 8, y: ty * T + 8, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 4 - 1, life: 40, max: 40, c: i % 2 ? '#b8783a' : '#4a2a14', s: 2 + (i % 2), g: 0.25 });
   addSeeds(1); addScore(25, tx * T + 8, ty * T, '+25');
+  if (state === 'play' && ++stats.crates === stats.cratesTotal) unlockAch('demenageur');
   SFX.crate(); SFX.seed(); addShake(3); buzz(12);
 }
 
@@ -1717,6 +1735,7 @@ const assistOn = () => parseFloat(save.settings.speed || 1) < 1 || !!save.settin
 function hurt(srcX) {
   const p = P; if (p.inv > 0 || state !== 'play' || p.dashT > 0) return;
   if (run.invincible) return;
+  stats.hurts++;
   if (p.leaf) { p.leaf = false; texts.push({ x: p.x + 5, y: p.y - 6, txt: 'La feuille s\'envole', life: 60 }); for (let i = 0; i < 10; i++) particles.push({ x: p.x + 5, y: p.y - 4, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2, life: 40, max: 40, c: '#7ccf4f', s: 2, g: 0.05 }); }
   else p.hearts--;
   p.inv = 90; p.vy = -4.5; p.vx = (p.x + p.w / 2 < srcX ? -1 : 1) * 2.6; p.hurtT = 16; p.jumping = false;
@@ -1792,8 +1811,9 @@ function shatter(e) {
 function splash(e) { for (let i = 0; i < 7; i++) particles.push({ x: e.x + 6, y: e.y0, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2.2, life: 22, max: 22, c: '#bfe9f5', s: 2, g: 0.15 }); }
 function killEnemy(e, dir) {
   const ex = e.x + e.w / 2, ey = e.y - 4;
+  stats.kills++;
   if (dir) addScore(150, ex, ey);
-  else { stats.combo++; const pts = (stats.combo >= 5 ? 1000 : 100 << (stats.combo - 1)); addScore(pts, ex, ey, stats.combo > 1 ? `+${pts} ×${stats.combo}` : '+' + pts); }
+  else { stats.combo++; const pts = (stats.combo >= 5 ? 1000 : 100 << (stats.combo - 1)); addScore(pts, ex, ey, stats.combo > 1 ? `+${pts} ×${stats.combo}` : '+' + pts); if (stats.combo >= 5) unlockAch('combo-5'); }
   e.dead = true; e.vy = -3.2; e.vx = dir ? dir * 2.2 : (grand() < 0.5 ? -0.6 : 0.6); e.rot = 0;
   SFX.stomp(); addShake(2.5); buzz(14);
   const col = e.type === 'b' ? '#b39cf5' : e.type === 'x' ? '#d6df6d' : e.type === 'f' ? '#5fd0ec' : '#ffcf3a';
@@ -2637,7 +2657,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', layout);
    Menus et écrans
    ========================================================= */
 const overlay = document.getElementById('overlay');
-const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores', profiles: 'pProfiles', daily: 'pDaily' };
+const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores', profiles: 'pProfiles', daily: 'pDaily', ach: 'pAch' };
 let panelStack = [];
 function showPanel(name, push = true) {
   releaseAllTouch();
@@ -2754,7 +2774,7 @@ function renderDaily() {
   }).catch(() => { const el = document.getElementById('dailyTop'); if (el) el.innerHTML = '<p class="hint">Classement en ligne indisponible pour le moment.</p>'; });
 }
 const totalHS = () => Object.values(save.best).reduce((a, b) => a + (b && b.score || 0), 0);
-function updateTitleHS() { updateProfBtn(); updateDailyBtn(); const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
+function updateTitleHS() { updateProfBtn(); updateDailyBtn(); updateAchBtn(); const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
 const SCORE_API = window.PEPIN_API || 'https://pepin-api.lhusser.fr/api/scores';
 let scoreTab = 'local', scoreLevel = 'total';
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2926,6 +2946,12 @@ function showResults() {
     document.getElementById('rTitle').textContent = 'Défi du jour : ' + L.def.name;
     document.getElementById('rSub').textContent = 'Rejoue autant que tu veux, ton meilleur score du jour compte.';
   }
+  {
+    const p = prof(), dailyCount = Object.keys(p.daily || {}).length + (dailyRun && !assisted && !(p.daily || {})[dailyRun] ? 1 : 0);
+    const r = { level: i, assisted, deaths: stats.deaths, hurts: stats.hurts, kills: stats.kills, seeds: stats.seeds, seedsTotal: stats.seedsTotal, gems: gemsN, medal,
+      classic: stats.classic, daily: dailyRun, dailyCount, crates: stats.crates, cratesTotal: stats.cratesTotal, beatGhost: !!(ghost && Number.isFinite(ghost.time) && stats.time < ghost.time) };
+    for (const id of endRunAchievements(r, p)) unlockAch(id, assisted);
+  }
   if (!assisted) {
     const needName = save.settings.online && (!save.playerName || save.playerName === 'Joueur 1');
     const secsR = Math.round(stats.time / 6) / 10, box = document.createElement('div'); box.className = 'recBox';
@@ -2990,6 +3016,7 @@ overlay.addEventListener('click', e => {
   else if (a === 'menu') goMenu();
   else if (a === 'quit') quitGame();
   else if (a === 'scores') { renderScores(); showPanel('scores'); }
+  else if (a === 'ach') { renderAch(); showPanel('ach'); }
   else if (a === 'profiles') { renderProfiles(); showPanel('profiles'); }
   else if (a === 'daily') { renderDaily(); showPanel('daily'); }
   else if (a === 'dailyGo') startLevel(dailyWorld(todayStr()), true);
@@ -3004,7 +3031,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.7';
+const APP_VERSION = '1.5.8';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -3066,7 +3093,9 @@ function cleanProfile(p, i) {
   const daily = {};
   for (const [d, v] of Object.entries(p.daily || {})) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(v)) daily[d] = num(v, 0, 60000, 0);
   const name = typeof p.name === 'string' && /^[\p{L}\p{N} _.'-]{2,12}$/u.test(p.name.trim()) ? p.name.trim() : 'Joueur ' + (i + 1);
-  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily,
+  const ach = {}; // succès : seulement des identifiants connus, avec leur date
+  for (const [id, t] of Object.entries(p.ach || {})) if (ACH_BY_ID[id] && Number.isFinite(t)) ach[id] = t;
+  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily, ach,
     uid: typeof p.uid === 'string' && /^[a-f0-9-]{16,40}$/i.test(p.uid) ? p.uid : newUid() };
 }
 /* Fusionne une sauvegarde importée : profils ajoutés ou remplacés (même identifiant), tableaux d'honneur réunis,
@@ -3201,6 +3230,84 @@ async function shareScore(btn) {
     if (btn) { btn.textContent = 'Image téléchargée, texte copié'; setTimeout(() => { btn.textContent = 'Partager mon score'; }, 3000); }
   }
 }
+
+/* =========================================================
+   Succès : défis optionnels, par joueur. Les succès d'adresse (skill) ne comptent pas en mode assistance.
+   ========================================================= */
+const ACH = [
+  { id: 'premiere-lanterne', n: 'Première lanterne', d: 'Terminer un monde.' },
+  { id: 'grand-frelon', n: 'Piqué au vif', d: 'Vaincre le Grand Frelon.' },
+  { id: 'frelon-royal', n: 'Fin de règne', d: 'Vaincre le Frelon Royal.' },
+  { id: 'douze-lanternes', n: 'Douze lanternes', d: 'Terminer les 12 mondes.' },
+  { id: 'premiere-rosee', n: 'Première rosée', d: 'Trouver une goutte de rosée.' },
+  { id: 'trois-rosees', n: 'Rosée du matin', d: 'Trouver les 3 gouttes d\'un monde en une seule partie.' },
+  { id: 'toutes-rosees', n: 'Collection de rosée', d: 'Trouver les 36 gouttes de rosée.' },
+  { id: 'jardinier', n: 'Jardinier', d: 'Ramasser toutes les graines d\'un monde en une seule partie.' },
+  { id: 'demenageur', n: 'Déménageur', d: 'Casser toutes les caisses d\'un monde en une seule partie.' },
+  { id: 'sans-chute', n: 'Pied sûr', d: 'Terminer un monde sans chute.', skill: true },
+  { id: 'combo-5', n: 'Rebonds en série', d: 'Rebondir sur 5 ennemis sans toucher le sol.', skill: true },
+  { id: 'intouchable', n: 'Intouchable', d: 'Vaincre un boss sans être touché ni tomber.', skill: true },
+  { id: 'a-l-ancienne', n: 'À l\'ancienne', d: 'Terminer un monde en mode classique sans perdre de vie.', skill: true },
+  { id: 'medaille', n: 'Médaillé', d: 'Gagner une médaille de temps.', skill: true },
+  { id: 'or-pur', n: 'Or pur', d: 'Gagner une médaille d\'or.', skill: true },
+  { id: 'tresor', n: 'Trésor des lanternes', d: 'Avoir l\'or dans les 12 mondes.', skill: true },
+  { id: 'ombre', n: 'Plus vite que mon ombre', d: 'Battre ton fantôme.', skill: true },
+  { id: 'premier-defi', n: 'Premier défi', d: 'Terminer un défi du jour.' },
+  { id: 'sept-defis', n: 'Fidèle au rendez-vous', d: 'Terminer 7 défis du jour.' },
+  { id: 'pacifiste', n: 'Pacifiste', d: 'Terminer le Verger sans vaincre un seul ennemi.', skill: true, hidden: true },
+];
+const ACH_BY_ID = Object.fromEntries(ACH.map(a => [a.id, a]));
+const achOf = (p = prof()) => p.ach || (p.ach = {});
+/* Succès mérités en fin de monde. r : bilan de la partie ; p : le profil, records déjà mis à jour. */
+function endRunAchievements(r, p) {
+  const ids = ['premiere-lanterne'], best = p.best || {}, done = Object.keys(best).filter(k => best[k]);
+  if (r.level === 5) ids.push('grand-frelon');
+  if (r.level === 11) ids.push('frelon-royal');
+  if (done.length >= LEVELS.length) ids.push('douze-lanternes');
+  if (r.gems >= 1) ids.push('premiere-rosee');
+  if (r.gems >= 3) ids.push('trois-rosees');
+  if (done.reduce((n, k) => n + (best[k].gems || []).filter(Boolean).length, 0) >= LEVELS.length * 3) ids.push('toutes-rosees');
+  if (r.seeds >= r.seedsTotal) ids.push('jardinier');
+  if (r.cratesTotal > 0 && r.crates >= r.cratesTotal) ids.push('demenageur');
+  if (r.daily) ids.push('premier-defi');
+  if (r.dailyCount >= 7) ids.push('sept-defis');
+  if (!r.assisted) {
+    if (r.deaths === 0) ids.push('sans-chute');
+    if (LEVELS[r.level].boss && r.deaths === 0 && r.hurts === 0) ids.push('intouchable');
+    if (r.classic && r.deaths === 0) ids.push('a-l-ancienne');
+    if (r.medal >= 1) ids.push('medaille');
+    if (r.medal >= 3) ids.push('or-pur');
+    if (LEVELS.every((_, i) => best[i] && best[i].medal >= 3)) ids.push('tresor');
+    if (r.beatGhost) ids.push('ombre');
+    if (r.level === 0 && r.kills === 0) ids.push('pacifiste');
+  }
+  return ids;
+}
+/* Débloque un succès pour le joueur actuel (jamais pendant un rejeu). Renvoie true s'il est nouveau. */
+function unlockAch(id, assisted) {
+  const def = ACH_BY_ID[id]; if (!def || replay || state === 'menu') return false;
+  if (def.skill && (assisted ?? (assistOn() || (stats && stats.assistUsed)))) return false;
+  const a = achOf(); if (a[id]) return false;
+  a[id] = Date.now(); persist(); achToast(def); return true;
+}
+const toastQueue = [];
+let toastBusy = false;
+function achToast(def) { toastQueue.push(def); if (!toastBusy) nextToast(); }
+function nextToast() {
+  const el = document.getElementById('achToast'), def = toastQueue.shift();
+  if (!def) { toastBusy = false; el.classList.remove('show'); return; }
+  toastBusy = true; el.innerHTML = `<b>Succès</b> ${esc(def.n)}`; el.classList.add('show'); SFX.power();
+  setTimeout(() => { el.classList.remove('show'); setTimeout(nextToast, 350); }, 2600);
+}
+function achListHtml(p = prof()) {
+  const a = achOf(p), n = ACH.filter(x => a[x.id]).length;
+  return `<p class="sub">${n} succès sur ${ACH.length}</p><div class="achList">` + ACH.map(x => {
+    const got = !!a[x.id], secret = x.hidden && !got;
+    return `<div class="ach${got ? ' got' : ''}"><span class="achIco">${got ? '★' : secret ? '?' : '☆'}</span><span><b>${secret ? 'Succès caché' : esc(x.n)}</b><small>${secret ? 'Continue d\'explorer…' : esc(x.d)}${got ? '' : x.skill ? ' (hors assistance)' : ''}</small></span></div>`;
+  }).join('') + '</div>';
+}
+function renderAch() { document.getElementById('achBox').innerHTML = achListHtml(); }
+function updateAchBtn() { const a = achOf(); document.getElementById('achBtn').textContent = `Succès (${ACH.filter(x => a[x.id]).length}/${ACH.length})`; }
 
 /* Réglages */
 const S = { ghost: 'sGhost', online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };

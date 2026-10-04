@@ -30,6 +30,8 @@ jobs:
         run: node --test tests/verif.test.js
       - name: Sauvegarde (export, import) et partage du score
         run: node --test tests/sauvegarde.test.js
+      - name: Succès
+        run: node --test tests/succes.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes

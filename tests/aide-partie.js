@@ -9,7 +9,7 @@ function partieTerminee({ defi = false } = {}) {
     m.entrees(robotFonceur(31 + essai));
     for (let k = 0; k < 20000 && m.etat() !== 'results'; k += 60) m.pas(60);
     if (m.etat() !== 'results') continue;
-    return { m, replay: m.ev('replayForServer(lastReplay)'), score: m.ev('scoreBreakdown(0).total'), time: Math.round(m.ev('stats.time') / 6) / 10, day: defi ? '2026-01-10' : undefined };
+    return { m, robot: String(31 + essai), replay: m.ev('replayForServer(lastReplay)'), score: m.ev('scoreBreakdown(0).total'), time: Math.round(m.ev('stats.time') / 6) / 10, day: defi ? '2026-01-10' : undefined };
   }
   throw new Error('le robot n\'a pas terminé le monde 1');
 }
