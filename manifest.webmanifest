@@ -1,0 +1,19 @@
+{
+  "name": "Pépin, la graine voyageuse",
+  "short_name": "Pépin",
+  "description": "Jeu de plateforme : 12 mondes, 2 boss, jouable au doigt, au clavier ou à la manette.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#1d1420",
+  "theme_color": "#1d1420",
+  "categories": ["games", "kids"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
