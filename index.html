@@ -66,6 +66,8 @@ body.playing #pauseBtn{display:flex;}
 #pauseBtn:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
 
 /* Commandes tactiles */
+#replayTag{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:6;background:rgba(20,12,22,.72);color:#fff;font-size:14px;padding:4px 12px;border-radius:999px;pointer-events:none;letter-spacing:.02em;}
+#replayTag[hidden]{display:none;}
 #touch{position:fixed;inset:0;z-index:5;display:none;--cs:1;--co:.6;touch-action:none;}
 body.has-touch.playing #touch{display:block;}
 #stickBase{
@@ -212,6 +214,7 @@ body.has-touch.playing #touch{display:block;}
 <body>
 <div id="app">
   <canvas id="screen" aria-label="Jeu Pépin"></canvas>
+  <div id="replayTag" hidden>Rejeu · Pause pour quitter</div>
   <button id="pauseBtn" aria-label="Mettre en pause"><span></span><span></span></button>
 
   <div id="touch" aria-hidden="true">
@@ -1195,12 +1198,81 @@ const WAKE_DIST = 280; // les ennemis s'éveillent à cette distance de Pépin (
 const dlen = (dx, dy) => Math.sqrt(dx * dx + dy * dy); // Math.sqrt est exact partout, Math.hypot non
 /* Réglages d'assistance figés dans la partie (lus au lancement et à la reprise après une pause) */
 const run = { easyJump: false, invincible: false };
-function syncRunSettings() { run.easyJump = !!save.settings.easyJump; run.invincible = !!save.settings.invincible; }
+function syncRunSettings(forced) { const s = forced || save.settings; run.easyJump = !!s.easyJump; run.invincible = !!s.invincible; }
 /* Source d'entrées externe (rejeu, fantôme, tests) : si définie, elle remplace les entrées du joueur à chaque pas */
 let inputFeed = null;
+/* Enregistrement et rejeu des parties.
+   À chaque pas de logique, les entrées (joystick arrondi, 5 boutons) et les réglages d'assistance tiennent sur un code de 14 bits.
+   Les codes identiques consécutifs sont regroupés (code, répétitions) puis écrits en varints et en base64 :
+   une minute de jeu tient en quelques centaines d'octets. L'empreinte finale permet de vérifier qu'un rejeu est fidèle. */
+const REPLAY_V = 1, REPLAY_KEY = 'pepin-replays-v1';
+let rec = null, replay = null, lastReplay = null;
+function tickCode() {
+  return (Math.round(input.x * 32) + 32) * 128 + (input.down ? 1 : 0) + (input.jump ? 2 : 0) + (input.dash ? 4 : 0)
+    + (input.jumpPressed ? 8 : 0) + (input.dashPressed ? 16 : 0) + (run.easyJump ? 32 : 0) + (run.invincible ? 64 : 0);
+}
+function applyCode(c) {
+  input.x = ((c >> 7) - 32) / 32; input.down = !!(c & 1); input.jump = !!(c & 2); input.dash = !!(c & 4);
+  input.jumpPressed = !!(c & 8); input.dashPressed = !!(c & 16); run.easyJump = !!(c & 32); run.invincible = !!(c & 64);
+}
+function stateHash() { // FNV-1a de l'état qui compte ; la conversion des nombres en texte est identique partout
+  const t = [P.x, P.y, P.vx, P.vy, P.hearts, stats.score, stats.time, stats.seeds, stats.deaths, stats.lives, rngState].join(',');
+  let h = 2166136261; for (let k = 0; k < t.length; k++) h = Math.imul(h ^ t.charCodeAt(k), 16777619) >>> 0;
+  return h.toString(16);
+}
+function recStart() { rec = { level: levelIdx, seed: runSeed, classic: stats.classic, daily: dailyRun, codes: [], runs: [], ticks: 0 }; }
+function recTick() {
+  const c = tickCode(), n = rec.codes.length;
+  if (n && rec.codes[n - 1] === c) rec.runs[n - 1]++; else { rec.codes.push(c); rec.runs.push(1); }
+  rec.ticks++;
+}
+function packReplay(r, fin) {
+  let bin = ''; const vint = v => { while (v > 127) { bin += String.fromCharCode((v & 127) | 128); v >>>= 7; } bin += String.fromCharCode(v); };
+  for (let k = 0; k < r.codes.length; k++) { vint(r.codes[k]); vint(r.runs[k]); }
+  return JSON.stringify({ v: REPLAY_V, app: APP_VERSION, level: r.level, seed: r.seed, classic: r.classic, daily: r.daily, ticks: r.ticks, time: r.time, fin, data: btoa(bin) });
+}
+function unpackReplay(str) {
+  try {
+    const o = JSON.parse(str); if (o.v !== REPLAY_V || !LEVELS[o.level]) return null;
+    const bin = atob(o.data), codes = [], runs = []; let k = 0;
+    const vint = () => { let v = 0, sh = 0, b; do { b = bin.charCodeAt(k++); v += (b & 127) * 2 ** sh; sh += 7; } while (b & 128); return v; };
+    while (k < bin.length) { codes.push(vint()); runs.push(vint()); }
+    return { ...o, codes, runs };
+  } catch (e) { return null; }
+}
+function replayTick() {
+  const p = replay;
+  if (p.i >= p.r.codes.length) { applyCode((p.r.codes[p.r.codes.length - 1] & 96) | 32 * 128); return; } // au-delà : immobile
+  applyCode(p.r.codes[p.i]); p.t++;
+  if (--p.left === 0) { p.i++; p.left = p.r.runs[p.i] || 0; }
+}
+/* Lance le rejeu d'une partie enregistrée ; back() est appelé à la fin ou si le joueur l'interrompt */
+function startReplay(str, back) {
+  const r = unpackReplay(str); if (!r || !r.codes.length) return false;
+  rec = null; dailyRun = null;
+  replay = { r, i: 0, left: r.runs[0], t: 0, back, ok: null };
+  armBack(); AU.init();
+  loadLevel(r.level, r.seed, { classic: r.classic, easyJump: r.codes[0] & 32, invincible: r.codes[0] & 64 });
+  state = 'play'; hidePanels(); playSong(LEVELS[r.level].song); layoutTouch();
+  document.getElementById('replayTag').hidden = false;
+  return true;
+}
+function endReplay(finished) {
+  const p = replay; if (!p) return;
+  p.ok = finished ? stateHash() === p.r.fin : null;
+  if (finished && !p.ok) console.warn('Pépin : rejeu désynchronisé (enregistré en ' + p.r.app + ')');
+  replay = null; document.getElementById('replayTag').hidden = true; releaseAllTouch();
+  if (p.back) p.back(p.ok);
+}
+/* Meilleure partie (temps) par monde et par profil, stockée à part de la sauvegarde : elle servira au fantôme */
+function loadReplays() { try { return JSON.parse(localStorage.getItem(REPLAY_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function storeReplays(all) { try { localStorage.setItem(REPLAY_KEY, JSON.stringify(all)); } catch (e) {} }
+function storeBestReplay(level, str) { const all = loadReplays(), id = prof().id; (all[id] = all[id] || {})[level] = str; storeReplays(all); }
+function bestReplay(level) { const p = loadReplays()[prof().id]; return (p && p[level]) || null; }
+function dropReplays(profileId) { const all = loadReplays(); delete all[profileId]; storeReplays(all); }
 
-function loadLevel(i, seed) {
-  levelIdx = i; seedRng(seed ?? Math.random() * 4294967296); syncRunSettings();
+function loadLevel(i, seed, forced) {
+  levelIdx = i; seedRng(seed ?? Math.random() * 4294967296); syncRunSettings(forced);
   const def = LEVELS[i];
   const b = Builder(def.w); def.build(b);
   TH = THEMES[def.theme]; TILES = buildTiles(TH); skyCache = null;
@@ -1238,7 +1310,7 @@ function loadLevel(i, seed) {
     if (e.skin === 'penguin') e.vx = -0.7; else if (e.skin === 'scorpion') e.vx = -0.55; else if (e.skin === 'frog') { e.vx = 0; e.t = (e.x * 3) % 90; }
     if (e.type === 'w') { e.hx = e.x0; e.hy = e.y0; e.st = 'idle'; e.cd = 0; }
   }
-  stats = { score: 0, combo: 0, seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: !!save.settings.classic, lives: 3, nextLife: 25 };
+  stats = { score: 0, combo: 0, seeds: 0, seedsTotal: seeds, gems: [false, false, false], time: 0, deaths: 0, classic: forced ? !!forced.classic : !!save.settings.classic, lives: 3, nextLife: 25 };
   cam.x = clamp(P.x - VW / 2, 0, L.w * T - VW); cam.y = clamp(P.y - VH * 0.55, minCamY(), maxCamY());
   crumbles = new Map(); irisT = 34; wind.active = wind.warn = false;
   introT = 170; bossIntroT = 0; clearT = 0; fadeT = 0; shake = 0;
@@ -1468,6 +1540,7 @@ function update() {
   }
   if (state === 'pause' || state === 'results') return;
   if (state === 'gameover') { fadeT++; if (fadeT === 70) showGameOver(); updateParticles(); return; }
+  if (replay) replayTick(); else if (rec) recTick(); // un pas de logique = un code enregistré ou rejoué
   if (state === 'play') { stats.time++; if (stats.time % 30 === 0 && assistOn()) stats.assistUsed = true; }
   if (introT > 0) introT--;
   updateMovers();
@@ -1640,6 +1713,7 @@ function loseLife() {
   startRespawn();
 }
 function gameOver() {
+  if (replay) { endReplay(true); return; }
   state = 'gameover'; fadeT = 0; P.vx = P.vy = 0; P.dashT = 0; stopSong(); releaseAllTouch();
   if (AU.ctx) { const t = AU.ctx.currentTime; [523, 466, 415, 392].forEach((f, i) => AU.tone(f, 0.32, 'triangle', 0.13, null, t + 0.2 + i * 0.22)); }
 }
@@ -2596,7 +2670,7 @@ function renderProfiles() {
     row.querySelector('.sel').onclick = () => { SFX.click(); save.current = p.id; persist(); renderProfiles(); updateProfBtn(); updateTitleHS(); };
     row.querySelector('[data-k=ren]').onclick = () => { const n = (prompt('Nouveau prénom', p.name) || '').trim(); if (/^[\p{L}\p{N} _.'-]{2,12}$/u.test(n)) { p.name = n; persist(); renderProfiles(); updateProfBtn(); } };
     const del = row.querySelector('[data-k=del]');
-    if (del) del.onclick = () => { if (!confirm(`Supprimer ${p.name} et toute sa progression ?`)) return; save.profiles = save.profiles.filter(x => x !== p); if (save.current === p.id) save.current = save.profiles[0].id; persist(); renderProfiles(); updateProfBtn(); updateTitleHS(); };
+    if (del) del.onclick = () => { if (!confirm(`Supprimer ${p.name} et toute sa progression ?`)) return; save.profiles = save.profiles.filter(x => x !== p); dropReplays(p.id); if (save.current === p.id) save.current = save.profiles[0].id; persist(); renderProfiles(); updateProfBtn(); updateTitleHS(); };
     box.appendChild(row);
   });
 }
@@ -2703,24 +2777,37 @@ function renderLevelList() {
 }
 function startLevel(i, daily) {
   dailyRun = daily ? todayStr() : null;
-  armBack(); AU.init(); loadLevel(i, dailyRun ? dailySeed(dailyRun) : undefined); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
+  replay = null; document.getElementById('replayTag').hidden = true;
+  armBack(); AU.init(); loadLevel(i, dailyRun ? dailySeed(dailyRun) : undefined); recStart(); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
 }
 function goMenu() {
   if (pendingReload) { location.reload(); return; }
+  rec = null; if (replay) { replay = null; document.getElementById('replayTag').hidden = true; }
   state = 'menu'; loadLevel(0); cam.x = 0; updateTitleHS(); showPanel('title'); panelStack = ['title']; playSong(3); disarmBack();
 }
 function openPause() {
   if (state !== 'play') return;
+  if (replay) { endReplay(false); return; } // Pause ou Échap pendant un rejeu : on revient d'où l'on vient
   state = 'pause'; stopSong(); releaseAllTouch();
   document.getElementById('pauseInfo').textContent = `${dailyRun ? 'Défi du jour · ' : ''}${L.def.sub} : ${L.def.name}. ${stats.seeds}/${stats.seedsTotal} graines, ${fmtTime(stats.time)}.`;
   panelStack = []; showPanel('pause');
 }
 function resumeGame() { syncRunSettings(); state = 'play'; hidePanels(); playSong(L.def.song); layoutTouch(); }
 function showResults() {
+  if (replay) { endReplay(true); return; }
   state = 'results';
   const i = levelIdx, prev = save.best[i], keepBest = prev ? JSON.parse(JSON.stringify(prev)) : null, keepUnl = save.unlocked, counts = !dailyRun || i < save.unlocked;
   const gemsN = stats.gems.filter(Boolean).length;
   const isRecord = counts && (!prev || stats.time < prev.time) && !(assistOn() || stats.assistUsed);
+  // Partie enregistrée : gardée pour « Revoir », et comme meilleure partie du monde si c'est le meilleur temps sans assistance
+  const done = rec ? packReplay({ ...rec, time: stats.time }, stateHash()) : null; rec = null;
+  if (done) {
+    lastReplay = done;
+    let bestT = Infinity; try { bestT = JSON.parse(bestReplay(i)).time ?? Infinity; } catch (e) {}
+    if (counts && !(assistOn() || stats.assistUsed) && stats.time < bestT) storeBestReplay(i, done);
+  }
+  const backToResults = () => { state = 'results'; panelStack = []; showPanel('results'); playSong(3); };
+  const addReplayBtn = add => { if (done) add('Revoir la partie', () => startReplay(done, backToResults)); };
   save.best[i] = {
     time: prev ? Math.min(prev.time, stats.time) : stats.time,
     seeds: prev ? Math.max(prev.seeds, stats.seeds) : stats.seeds,
@@ -2761,6 +2848,7 @@ function showResults() {
   const add = (label, fn, primary) => { const b = document.createElement('button'); b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = () => { SFX.click(); fn(); }; btns.appendChild(b); };
   if (!last) add('Monde suivant', () => startLevel(i + 1), true);
   add('Rejouer ce monde', () => startLevel(i), last);
+  addReplayBtn(add);
   add('Retour au menu', goMenu);
   panelStack = []; showPanel('results');
   playSong(3);
@@ -2768,7 +2856,7 @@ function showResults() {
   if (dailyRun) {
     const b = document.getElementById('rButtons'); b.innerHTML = '';
     const add = (label, fn, primary) => { const x = document.createElement('button'); x.className = 'btn' + (primary ? ' primary' : ''); x.textContent = label; x.onclick = () => { SFX.click(); fn(); }; b.appendChild(x); };
-    add('Rejouer le défi', () => startLevel(i, true), true); add('Retour au menu', goMenu);
+    add('Rejouer le défi', () => startLevel(i, true), true); addReplayBtn(add); add('Retour au menu', goMenu);
     document.getElementById('rTitle').textContent = 'Défi du jour : ' + L.def.name;
     document.getElementById('rSub').textContent = 'Rejoue autant que tu veux, ton meilleur score du jour compte.';
   }
@@ -2848,7 +2936,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.3';
+const APP_VERSION = '1.5.4';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;

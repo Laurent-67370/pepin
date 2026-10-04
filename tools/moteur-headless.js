@@ -31,7 +31,7 @@ function creerMoteur({ alea = Math.random, reglages = {} } = {}) {
   const g = {
     console, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: () => 0, cancelAnimationFrame() {}, queueMicrotask() {},
-    performance: { now: () => 0 }, crypto: globalThis.crypto, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone,
+    performance: { now: () => 0 }, crypto: globalThis.crypto, URL, URLSearchParams, TextEncoder, TextDecoder, structuredClone, btoa, atob,
     fetch: () => new Promise(() => {}), innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1,
     localStorage: { getItem: k => (stockage.has(k) ? stockage.get(k) : null), setItem: (k, v) => stockage.set(k, String(v)), removeItem: k => stockage.delete(k) },
     document: inerte(), navigator: inerte(), location: inerte(), history: inerte(), screen: inerte(),
@@ -53,6 +53,8 @@ function creerMoteur({ alea = Math.random, reglages = {} } = {}) {
     lancer(monde, graine) { ev(`dailyRun = null; armBack(); loadLevel(${monde}, ${graine}); state = 'play';`); },
     /* Fournit la source d'entrées : fn(numéro du pas) renvoie { x, down, jump, dash, jumpPressed, dashPressed } */
     entrees(fn) { let k = 0; ctx.__feed = () => fn(k++); ev(`inputFeed = inp => Object.assign(inp, __feed(), { pausePressed: false })`); },
+    /* Lance un monde comme le joueur (bouton Jouer) : graine tirée au hasard, partie enregistrée */
+    jouerMonde(monde) { ev(`startLevel(${monde})`); },
     pas(n = 1) { for (let k = 0; k < n; k++) ev('update()'); },
     etat: () => ev('state'),
     /* Empreinte de tout ce qui compte pour la partie (pas les particules ni la caméra) */

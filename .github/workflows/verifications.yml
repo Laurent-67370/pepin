@@ -22,6 +22,8 @@ jobs:
         run: node --test tests/serveur.test.js
       - name: Déterminisme du jeu (même graine et mêmes entrées, même partie)
         run: node --test tests/determinisme.test.js
+      - name: Enregistrement et rejeu des parties
+        run: node --test tests/rejeu.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes
