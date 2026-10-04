@@ -101,8 +101,8 @@ test('encodage : aller-retour exact, y compris les très longues répétitions',
   assert.equal(m.ev('unpackReplay("pas un rejeu")'), null);
 });
 
-test('taille : une minute de jeu tient en moins de 4 Ko', () => {
-  const p = partie(0, { pas: 3600, robot: 77 });
-  console.log(`    une minute de jeu du robot : ${p.str.length} octets`);
-  assert.ok(p.str.length < 4096, p.str.length + ' octets');
+test('taille : une minute d\'entrées tient en moins de 4 Ko (hors trajectoire du fantôme)', () => {
+  const p = partie(0, { pas: 3600, robot: 77 }), n = JSON.parse(p.str).data.length;
+  console.log(`    une minute d'entrées du robot : ${n} octets`);
+  assert.ok(n < 4096, n + ' octets');
 });

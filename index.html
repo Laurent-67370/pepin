@@ -272,6 +272,7 @@ body.has-touch.playing #touch{display:block;}
       <label class="set"><span>Assistance : invincible<small style="display:block;font-size:13px;color:var(--muted)">Ennemis et épines inoffensifs. Une chute ramène au dernier sol sûr.</small></span><input type="checkbox" id="sInvincible"></label>
       <label class="set"><span>Assistance : sauts faciles<small style="display:block;font-size:13px;color:var(--muted)">Double saut, et saut accepté plus longtemps au bord du vide.</small></span><input type="checkbox" id="sEasyJump"></label>
       <label class="set"><span>Mode classique<small style="display:block;font-size:13px;color:var(--muted)">3 vies par monde, Game Over possible. Pris en compte au prochain monde.</small></span><input type="checkbox" id="sClassic"></label>
+      <label class="set"><span>Fantôme du meilleur temps<small style="display:block;font-size:13px;color:var(--muted)">Ta meilleure partie du monde court à côté de toi, en transparence.</small></span><input type="checkbox" id="sGhost"></label>
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
       <p class="hint" id="appVersion"></p>
     </section>
@@ -338,7 +339,7 @@ let VW = 384;
 const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const SAVE_KEY = 'pepin-save-v1';
-let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false, online: true }, hof: {}, playerName: '', deviceId: '' };
+let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false, online: true, ghost: true }, hof: {}, playerName: '', deviceId: '' };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (s) save = { ...save, ...s, settings: { ...save.settings, ...(s.settings || {}) } };
@@ -1206,7 +1207,7 @@ let inputFeed = null;
    Les codes identiques consécutifs sont regroupés (code, répétitions) puis écrits en varints et en base64 :
    une minute de jeu tient en quelques centaines d'octets. L'empreinte finale permet de vérifier qu'un rejeu est fidèle. */
 const REPLAY_V = 1, REPLAY_KEY = 'pepin-replays-v1';
-let rec = null, replay = null, lastReplay = null;
+let rec = null, replay = null, lastReplay = null, ghost = null;
 function tickCode() {
   return (Math.round(input.x * 32) + 32) * 128 + (input.down ? 1 : 0) + (input.jump ? 2 : 0) + (input.dash ? 4 : 0)
     + (input.jumpPressed ? 8 : 0) + (input.dashPressed ? 16 : 0) + (run.easyJump ? 32 : 0) + (run.invincible ? 64 : 0);
@@ -1220,16 +1221,38 @@ function stateHash() { // FNV-1a de l'état qui compte ; la conversion des nombr
   let h = 2166136261; for (let k = 0; k < t.length; k++) h = Math.imul(h ^ t.charCodeAt(k), 16777619) >>> 0;
   return h.toString(16);
 }
-function recStart() { rec = { level: levelIdx, seed: runSeed, classic: stats.classic, daily: dailyRun, codes: [], runs: [], ticks: 0 }; }
+function recStart() { rec = { level: levelIdx, seed: runSeed, classic: stats.classic, daily: dailyRun, codes: [], runs: [], ticks: 0, path: [] }; }
+/* Trajectoire pour le fantôme : position arrondie de Pépin tous les 2 pas, avec sa pose (sens, en l'air, en marche, caché) */
+const GHOST_STEP = 2;
+function poseFlags() { return (P.face < 0 ? 1 : 0) | (P.onGround ? 0 : 2) | (Math.abs(P.vx) > 0.3 ? 4 : 0) | (state === 'respawn' && fadeT < 30 ? 8 : 0); }
 function recTick() {
   const c = tickCode(), n = rec.codes.length;
   if (n && rec.codes[n - 1] === c) rec.runs[n - 1]++; else { rec.codes.push(c); rec.runs.push(1); }
+  if (rec.ticks % GHOST_STEP === 0) rec.path.push(Math.round(P.x), Math.round(P.y), poseFlags());
   rec.ticks++;
 }
 function packReplay(r, fin) {
-  let bin = ''; const vint = v => { while (v > 127) { bin += String.fromCharCode((v & 127) | 128); v >>>= 7; } bin += String.fromCharCode(v); };
+  let bin = ''; const vint = v => { while (v > 127) { bin += String.fromCharCode((v & 127) | 128); v = Math.floor(v / 128); } bin += String.fromCharCode(v); };
   for (let k = 0; k < r.codes.length; k++) { vint(r.codes[k]); vint(r.runs[k]); }
-  return JSON.stringify({ v: REPLAY_V, app: APP_VERSION, level: r.level, seed: r.seed, classic: r.classic, daily: r.daily, ticks: r.ticks, time: r.time, fin, data: btoa(bin) });
+  const data = btoa(bin); bin = '';
+  // Trajectoire : écarts entre positions successives (zigzag : 0, -1, 1, -2… → 0, 1, 2, 3…).
+  // Le bit bas de l'écart horizontal signale un changement de pose, écrite seulement dans ce cas : 2 octets par échantillon le plus souvent
+  const zz = d => (d < 0 ? -2 * d - 1 : 2 * d), pa = r.path || [];
+  for (let k = 0; k < pa.length; k += 3) {
+    const chg = !k || pa[k + 2] !== pa[k - 1];
+    vint(zz(pa[k] - (k ? pa[k - 3] : 0)) * 2 + (chg ? 1 : 0)); vint(zz(pa[k + 1] - (k ? pa[k - 2] : 0))); if (chg) vint(pa[k + 2]);
+  }
+  return JSON.stringify({ v: REPLAY_V, app: APP_VERSION, level: r.level, seed: r.seed, classic: r.classic, daily: r.daily, ticks: r.ticks, time: r.time, fin, data,
+    ...(pa.length ? { path: btoa(bin), step: GHOST_STEP } : {}) });
+}
+function unpackPath(o) {
+  if (!o || !o.path) return null;
+  const bin = atob(o.path), xs = [], ys = [], fl = []; let k = 0, x = 0, y = 0;
+  const vint = () => { let v = 0, sh = 0, b; do { b = bin.charCodeAt(k++); v += (b & 127) * 2 ** sh; sh += 7; } while (b & 128); return v; };
+  const unz = v => (v % 2 ? -(v + 1) / 2 : v / 2);
+  let f = 0;
+  while (k < bin.length) { const a = vint(); x += unz(Math.floor(a / 2)); y += unz(vint()); if (a % 2) f = vint(); xs.push(x); ys.push(y); fl.push(f); }
+  return { xs, ys, fl, step: o.step || GHOST_STEP, time: o.time };
 }
 function unpackReplay(str) {
   try {
@@ -1249,7 +1272,7 @@ function replayTick() {
 /* Lance le rejeu d'une partie enregistrée ; back() est appelé à la fin ou si le joueur l'interrompt */
 function startReplay(str, back) {
   const r = unpackReplay(str); if (!r || !r.codes.length) return false;
-  rec = null; dailyRun = null;
+  rec = null; dailyRun = null; ghost = null;
   replay = { r, i: 0, left: r.runs[0], t: 0, back, ok: null };
   armBack(); AU.init();
   loadLevel(r.level, r.seed, { classic: r.classic, easyJump: r.codes[0] & 32, invincible: r.codes[0] & 64 });
@@ -1522,8 +1545,9 @@ function snapshot() {
   for (const m of movers) { m.px = m.x; m.py = m.y; }
   if (boss) { boss.px = boss.x; boss.py = boss.y; }
 }
+let interpA = 0;
 function withInterp(a, fn) {
-  const saved = [];
+  interpA = a; const saved = [];
   const lerp = o => { if (!o || o.px == null) return; const dx = o.x - o.px, dy = o.y - o.py; if (dx * dx + dy * dy > 2500) return; saved.push(o, o.x, o.y); o.x = o.px + dx * a; o.y = o.py + dy * a; };
   if (state !== 'pause' && state !== 'results') { lerp(cam); lerp(P); for (const e of enemies) lerp(e); for (const m of movers) lerp(m); lerp(boss); }
   try { fn(); } finally { for (let i = 0; i < saved.length; i += 3) { saved[i].x = saved[i + 1]; saved[i].y = saved[i + 2]; } }
@@ -1541,6 +1565,7 @@ function update() {
   if (state === 'pause' || state === 'results') return;
   if (state === 'gameover') { fadeT++; if (fadeT === 70) showGameOver(); updateParticles(); return; }
   if (replay) replayTick(); else if (rec) recTick(); // un pas de logique = un code enregistré ou rejoué
+  if (ghost) ghost.t++;
   if (state === 'play') { stats.time++; if (stats.time % 30 === 0 && assistOn()) stats.assistUsed = true; }
   if (introT > 0) introT--;
   updateMovers();
@@ -2372,6 +2397,28 @@ function pepState(p) {
     mood: state === 'clear' || state === 'results' ? 'happy' : p.hurtT > 0 ? 'hurt' : p.dashT > 0 ? 'dash' : 'normal',
     leafA: p.leafA || 0, leafS: p.leafS != null ? p.leafS : 0.45, leafBig: p.leaf };
 }
+/* Position du fantôme au pas t (entre deux échantillons : interpolation, sauf en cas de saut de position) */
+function ghostAt(g, t) {
+  const f = Math.max(0, t) / g.step, i = Math.floor(f), n = g.xs.length;
+  if (i >= n - 1) return { x: g.xs[n - 1], y: g.ys[n - 1], fl: g.fl[n - 1], done: i >= n };
+  const a = f - i, dx = g.xs[i + 1] - g.xs[i], dy = g.ys[i + 1] - g.ys[i], far = dx * dx + dy * dy > 2500;
+  return { x: far ? g.xs[i] : g.xs[i] + dx * a, y: far ? g.ys[i] : g.ys[i] + dy * a, fl: g.fl[i], done: false };
+}
+function drawGhost() {
+  const g = ghost; if (!g || state === 'menu') return;
+  const q = ghostAt(g, g.t - 1 + interpA); if (q.fl & 8) return;
+  const fade = q.done ? Math.max(0, 1 - (g.t / g.step - g.xs.length) / 30) : 1; if (fade <= 0) return; // arrivé : il s'efface
+  const face = q.fl & 1 ? -1 : 1, cx = Math.round((q.x + 5) * 2) / 2, by = Math.round((q.y + 14) * 2) / 2;
+  const img = renderPep({ t: globalT, ph: g.t * 0.2, moving: !!(q.fl & 4), air: !!(q.fl & 2), vy: 0, blink: false, mood: 'normal', leafA: 0, leafS: 0.45, leafBig: false });
+  ctx.save(); ctx.globalAlpha = 0.38 * fade; ctx.translate(cx, by); ctx.scale(face, 1); ctx.drawImage(img, -8, -19.5, 16, 20); ctx.restore();
+  // Hors de l'écran : petite flèche sur le bord, à sa hauteur
+  const sx = q.x + 5 - cam.x;
+  if (!q.done && (sx < -6 || sx > VW + 6)) {
+    const ex = sx < 0 ? 4 : VW - 4, ey = clamp(by - 8 - cam.y, 10, VH - 10), d = sx < 0 ? -1 : 1;
+    ctx.save(); ctx.translate(cam.x, cam.y); ctx.globalAlpha = 0.55; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(ex + d * 3, ey); ctx.lineTo(ex - d * 3, ey - 4); ctx.lineTo(ex - d * 3, ey + 4); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+}
 function drawPlayer() {
   const p = P;
   if (state !== 'respawn' || fadeT >= 30) dropShadow(p.x + p.w / 2, p.y + p.h, 12);
@@ -2474,7 +2521,7 @@ function render() {
   const ox = Math.round((cam.x + sx) * RS) / RS, oy = Math.round((cam.y + sy) * RS) / RS;
   ctx.save(); ctx.translate(-ox, -oy);
   drawTiles(); drawWorldObjects(); drawItems(); drawEnemies(); drawBoss();
-  if (state !== 'menu') drawPlayer();
+  if (state !== 'menu') { drawGhost(); drawPlayer(); }
   drawParticles();
   ctx.restore();
   if (Q.fx) drawFog();
@@ -2778,11 +2825,13 @@ function renderLevelList() {
 function startLevel(i, daily) {
   dailyRun = daily ? todayStr() : null;
   replay = null; document.getElementById('replayTag').hidden = true;
-  armBack(); AU.init(); loadLevel(i, dailyRun ? dailySeed(dailyRun) : undefined); recStart(); state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
+  armBack(); AU.init(); loadLevel(i, dailyRun ? dailySeed(dailyRun) : undefined); recStart();
+  ghost = null; if (!dailyRun && save.settings.ghost !== false) { try { ghost = unpackPath(JSON.parse(bestReplay(i))); if (ghost) ghost.t = 0; } catch (e) { ghost = null; } }
+  state = 'play'; hidePanels(); playSong(LEVELS[i].song); layoutTouch();
 }
 function goMenu() {
   if (pendingReload) { location.reload(); return; }
-  rec = null; if (replay) { replay = null; document.getElementById('replayTag').hidden = true; }
+  rec = null; ghost = null; if (replay) { replay = null; document.getElementById('replayTag').hidden = true; }
   state = 'menu'; loadLevel(0); cam.x = 0; updateTitleHS(); showPanel('title'); panelStack = ['title']; playSong(3); disarmBack();
 }
 function openPause() {
@@ -2936,7 +2985,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.5';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -2979,7 +3028,7 @@ function quitGame() {
 }
 
 /* Réglages */
-const S = { online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
+const S = { ghost: 'sGhost', online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
 function fillSettings() {
   document.getElementById('appVersion').textContent = 'Version ' + APP_VERSION + (standalone ? ' · application installée' : '');
   for (const k in S) { const el = document.getElementById(S[k]); if (el.type === 'checkbox') el.checked = !!save.settings[k]; else el.value = save.settings[k]; }

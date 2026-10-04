@@ -12,7 +12,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - Carte du monde, médailles de temps (bronze, argent, or) par monde
 - Mode assistance (vitesse réduite, invincibilité, double saut), mode classique avec vies limitées, qualité graphique automatique
 - Tactile : joystick flottant, saut sur toute la moitié droite, bouton Élan
-- Bouton « Revoir la partie » en fin de monde ; la meilleure partie de chaque monde est gardée
+- Bouton « Revoir la partie » en fin de monde, et fantôme du meilleur temps qui court à côté de Pépin (désactivable dans les réglages)
 - Clavier : flèches ou ZQSD, Espace pour sauter, X ou Maj pour l'Élan, Échap pour la pause
 
 ## Installer
@@ -25,6 +25,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - `node --test tests/serveur.test.js` teste le serveur de classement (validation, défi du jour, anti-abus, sauvegarde, purge).
 - `node --test tests/determinisme.test.js` fait tourner le vrai jeu dans Node (`tools/moteur-headless.js`) et vérifie qu'une même graine et les mêmes entrées donnent exactement la même partie, quels que soient l'écran et l'aléatoire de l'affichage.
 - `node --test tests/rejeu.test.js` enregistre des parties, les rejoue sur un autre « appareil » et vérifie qu'elles retombent exactement sur le même état.
+- `node --test tests/fantome.test.js` vérifie la trajectoire du fantôme, son rythme, et qu'il n'influence jamais la partie.
 
 Ces vérifications tournent automatiquement sur GitHub Actions à chaque push.
 

@@ -24,6 +24,8 @@ jobs:
         run: node --test tests/determinisme.test.js
       - name: Enregistrement et rejeu des parties
         run: node --test tests/rejeu.test.js
+      - name: Fantôme du meilleur temps
+        run: node --test tests/fantome.test.js
 
   niveaux:
     name: Robot vérificateur des 12 mondes
