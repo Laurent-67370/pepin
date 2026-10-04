@@ -164,6 +164,20 @@ body.has-touch.playing #touch{display:block;}
 .stats{margin:14px 0 18px;font-size:19px;}
 .stats div{display:flex;justify-content:space-between;padding:7px 0;border-bottom:2px dashed rgba(122,90,68,.35);}
 .stats div:last-child{border-bottom:0;}
+.tabs{display:flex;gap:8px;margin:4px 0 6px;}
+.tab{flex:1;font-family:var(--font);font-size:17px;font-weight:600;padding:8px;border:3px solid var(--bark);border-radius:8px;background:var(--paper-2);color:var(--text);cursor:pointer;}
+.tab.on{background:var(--amber);color:#2a1a12;}
+.scoreRow.me{background:rgba(240,160,58,.18);border-radius:6px;padding-left:6px;padding-right:6px;}
+.scoreRow .rk{display:inline-block;min-width:1.8em;font-weight:700;color:var(--amber-d);}
+.stats .nameForm{display:block;border-bottom:2px solid var(--amber);padding:10px 12px;}
+.stats .nameForm .row2{display:flex;justify-content:flex-start;padding:0;border:0;}
+#scoreLevel{max-width:60%;}
+.nameForm{background:rgba(240,160,58,.16);border:2px solid var(--amber);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+.nameForm label{display:block;font-size:16px;font-weight:600;margin-bottom:8px;}
+.nameForm .row2{display:flex;gap:8px;}
+.nameForm input{flex:1;min-width:0;font-family:var(--font);font-size:20px;padding:8px 10px;border:3px solid var(--bark);border-radius:8px;background:var(--paper);color:var(--text);}
+.nameForm .btn{flex:0 0 auto;font-size:18px;padding:8px 14px;}
+.nameForm p{margin-top:8px;font-size:14px;color:var(--muted);}
 .stats .sc{font-size:16px;color:var(--muted);padding:4px 0;}
 .stats .total{font-size:24px;border-top:3px solid var(--bark);border-bottom:0;padding-top:10px;margin-top:4px;}
 .hs{margin:-12px 0 16px;font-size:17px;color:var(--text);}
@@ -234,6 +248,7 @@ body.has-touch.playing #touch{display:block;}
       </label>
       <label class="set">Mode gaucher<input type="checkbox" id="sLefty"></label>
       <label class="set">Vibrations<input type="checkbox" id="sHaptics"></label>
+      <label class="set"><span>Classement en ligne<small style="display:block;font-size:13px;color:var(--muted)">Envoie ton prénom et tes records au classement partagé.</small></span><input type="checkbox" id="sOnline"></label>
       <label class="set">Musique<input type="checkbox" id="sMusic"></label>
       <label class="set">Effets sonores<input type="checkbox" id="sSfx"></label>
       <label class="set"><span>Assistance : vitesse du jeu<small style="display:block;font-size:13px;color:var(--muted)">Ralentit tout le jeu pour laisser plus de temps.</small></span>
@@ -260,7 +275,8 @@ body.has-touch.playing #touch{display:block;}
 
     <section id="pScores" class="panel">
       <h2>Meilleurs scores</h2>
-      <p class="sub">Le score total additionne ton meilleur score dans chaque monde.</p>
+      <div class="tabs" role="tablist"><button class="tab on" data-tab="local" role="tab">Cet appareil</button><button class="tab" data-tab="online" role="tab">En ligne</button></div>
+      <label class="set" style="border:0;padding-top:4px">Classement<select id="scoreLevel"></select></label>
       <div id="scoreList"></div>
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
     </section>
@@ -291,11 +307,13 @@ let VW = 384;
 const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const SAVE_KEY = 'pepin-save-v1';
-let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false } };
+let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false, online: true }, hof: {}, playerName: '', deviceId: '' };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (s) save = { ...save, ...s, settings: { ...save.settings, ...(s.settings || {}) } };
 } catch (e) {}
+if (!save.hof) save.hof = {};
+if (!save.deviceId) save.deviceId = (crypto.randomUUID ? crypto.randomUUID() : Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -2510,14 +2528,66 @@ function showMapInfo(i, locked) {
 }
 const totalHS = () => Object.values(save.best).reduce((a, b) => a + (b && b.score || 0), 0);
 function updateTitleHS() { const t = totalHS(), el = document.getElementById('hsTotal'); el.hidden = !t; el.innerHTML = `Meilleur score total : <strong>${fmtNum(t)}</strong>`; }
+const SCORE_API = window.PEPIN_API || 'https://pepin-api.lhusser.fr/api/scores';
+let scoreTab = 'local', scoreLevel = 'total';
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function renderScores() {
-  let h = '';
-  LEVELS.forEach((lv, i) => {
-    const b = save.best[i], locked = i + 1 > save.unlocked, sc = b && b.score || 0, med = b && b.medal || 0;
-    h += `<div class="scoreRow"><span>${i + 1}. ${lv.name}<small>${locked ? 'Verrouillé' : b ? `<span class="medal m${med}"></span>${MEDAL_NAME[med]}${b.time < 359999 ? ' · ' + fmtTime(b.time) : ''}` : 'Pas encore terminé'}</small></span><strong>${sc ? fmtNum(sc) : '—'}</strong></div>`;
-  });
-  h += `<div class="scoreRow tot"><span>Total</span><strong>${fmtNum(totalHS())}</strong></div>`;
-  document.getElementById('scoreList').innerHTML = h;
+  const sel = document.getElementById('scoreLevel');
+  if (!sel.options.length) {
+    sel.innerHTML = '<option value="total">Score total</option>' + LEVELS.map((lv, i) => `<option value="${i}">${i + 1}. ${lv.name}</option>`).join('');
+    sel.onchange = () => { scoreLevel = sel.value; renderScores(); };
+    document.querySelectorAll('#pScores .tab').forEach(b => b.onclick = () => { SFX.click(); scoreTab = b.dataset.tab; renderScores(); });
+  }
+  sel.value = scoreLevel;
+  document.querySelectorAll('#pScores .tab').forEach(b => b.classList.toggle('on', b.dataset.tab === scoreTab));
+  const box = document.getElementById('scoreList');
+  if (scoreTab === 'local') {
+    let h = '';
+    if (scoreLevel === 'total') {
+      LEVELS.forEach((lv, i) => {
+        const b = save.best[i], locked = i + 1 > save.unlocked, sc = b && b.score || 0, med = b && b.medal || 0;
+        h += `<div class="scoreRow"><span>${i + 1}. ${lv.name}<small>${locked ? 'Verrouillé' : b ? `<span class="medal m${med}"></span>${MEDAL_NAME[med]}${b.time < 359999 ? ' · ' + fmtTime(b.time) : ''}` : 'Pas encore terminé'}</small></span><strong>${sc ? fmtNum(sc) : '—'}</strong></div>`;
+      });
+      h += `<div class="scoreRow tot"><span>Total</span><strong>${fmtNum(totalHS())}</strong></div>`;
+    } else {
+      const list = save.hof[scoreLevel] || [];
+      h = list.length ? list.map((e, k) => `<div class="scoreRow"><span><span class="rk">${k + 1}.</span>${esc(e.name)}<small>${fmtTime(e.time * 60)}</small></span><strong>${fmtNum(e.score)}</strong></div>`).join('')
+        : '<p class="hint">Aucun record enregistré pour ce monde sur cet appareil.</p>';
+    }
+    box.innerHTML = h; return;
+  }
+  if (!save.settings.online) { box.innerHTML = '<p class="hint">Le classement en ligne est désactivé dans les Réglages.</p>'; return; }
+  box.innerHTML = '<p class="hint">Chargement du classement…</p>';
+  const want = scoreLevel;
+  fetch(`${SCORE_API}?level=${want}`).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+    if (want !== scoreLevel || scoreTab !== 'online') return;
+    const me = save.deviceId.slice(0, 8);
+    box.innerHTML = d.top.length ? d.top.map(e => `<div class="scoreRow${e.device === me ? ' me' : ''}"><span><span class="rk">${e.rank}.</span>${esc(e.name)}<small>${want === 'total' ? e.worlds + ' monde' + (e.worlds > 1 ? 's' : '') : fmtTime(e.time * 60)}${e.device === me ? ' · toi' : ''}</small></span><strong>${fmtNum(e.score)}</strong></div>`).join('')
+      : '<p class="hint">Personne n\'a encore enregistré de score ici. À toi de jouer !</p>';
+  }).catch(() => { if (want === scoreLevel && scoreTab === 'online') box.innerHTML = '<p class="hint">Classement en ligne indisponible pour le moment (pas de réseau, ou serveur pas encore installé).</p>'; });
+}
+function submitOnline(level, score, time, cb) {
+  if (!save.settings.online || !save.playerName) { cb && cb(null); return; }
+  fetch(SCORE_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, score, time, name: save.playerName, device: save.deviceId, v: APP_VERSION }) })
+    .then(r => r.json()).then(d => cb && cb(d && d.ok ? d : null)).catch(() => cb && cb(null));
+}
+function hofQualifies(level, score) { const l = save.hof[level] || []; return score > 0 && (l.length < 5 || score > l[l.length - 1].score); }
+function hofInsert(level, entry) { const l = (save.hof[level] || []).concat(entry).sort((a, b) => b.score - a.score || a.time - b.time).slice(0, 5); save.hof[level] = l; return l.indexOf(entry) + 1; }
+function nameForm(level, score, time) {
+  const box = document.getElementById('rStats'), f = document.createElement('div'); f.className = 'nameForm';
+  f.innerHTML = `<label for="nameIn">Record ! Ton prénom pour le tableau :</label><div class="row2"><input id="nameIn" maxlength="12" autocomplete="nickname" enterkeyhint="done" value="${esc(save.playerName || '')}" placeholder="Prénom"><button class="btn primary" id="nameOk">Enregistrer</button></div><p id="nameMsg"></p>`;
+  box.prepend(f);
+  const inp = f.querySelector('#nameIn'), msg = f.querySelector('#nameMsg');
+  const ok = () => {
+    const name = inp.value.trim();
+    if (!/^[\p{L}\p{N} _.'-]{2,12}$/u.test(name)) { msg.textContent = 'De 2 à 12 lettres ou chiffres, s\'il te plaît.'; inp.focus(); return; }
+    save.playerName = name; const rank = hofInsert(level, { name, score, time, date: Date.now() }); persist(); SFX.gem();
+    f.innerHTML = `<label>Bravo ${esc(name)} ! ${rank === 1 ? '1re' : rank + 'e'} place sur cet appareil.</label><p id="nameMsg">${save.settings.online ? 'Envoi au classement en ligne…' : ''}</p>`;
+    const m2 = f.querySelector('#nameMsg');
+    submitOnline(level, score, time, d => { if (save.settings.online) m2.textContent = d ? `Classement en ligne : ${d.rank === 1 ? '1re' : d.rank + 'e'} place sur ${d.total}.` : 'Classement en ligne indisponible pour le moment, ton record reste enregistré ici.'; });
+  };
+  f.querySelector('#nameOk').onclick = ok;
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
 }
 function renderLevelList() {
   const list = document.getElementById('levelList'); list.innerHTML = '';
@@ -2593,6 +2663,11 @@ function showResults() {
   add('Retour au menu', goMenu);
   panelStack = []; showPanel('results');
   playSong(3);
+  if (!assisted) {
+    const secsR = Math.round(stats.time / 6) / 10;
+    if (hofQualifies(i, total)) nameForm(i, total, secsR);
+    else if (newHS && save.playerName) submitOnline(i, total, secsR);
+  }
 }
 function toggleFullscreen() {
   const d = document, el = d.documentElement;
@@ -2627,7 +2702,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -2670,7 +2745,7 @@ function quitGame() {
 }
 
 /* Réglages */
-const S = { speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
+const S = { online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
 function fillSettings() {
   document.getElementById('appVersion').textContent = 'Version ' + APP_VERSION + (standalone ? ' · application installée' : '');
   for (const k in S) { const el = document.getElementById(S[k]); if (el.type === 'checkbox') el.checked = !!save.settings[k]; else el.value = save.settings[k]; }
