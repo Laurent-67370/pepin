@@ -30,6 +30,8 @@ jobs:
         run: node --test tests/verif.test.js
       - name: Sauvegarde (export, import) et partage du score
         run: node --test tests/sauvegarde.test.js
+      - name: Cachettes et graines d'or (12 mondes)
+        run: node --test tests/secrets.test.js
       - name: Succès
         run: node --test tests/succes.test.js
 

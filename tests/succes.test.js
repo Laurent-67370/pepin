@@ -13,9 +13,9 @@ const BASE = { level: 2, assisted: false, deaths: 3, hurts: 2, kills: 4, seeds: 
 /* Succès mérités pour un bilan donné, avec un profil (records) donné */
 const merites = (r, best = {}) => J(outil, `endRunAchievements(${JSON.stringify({ ...BASE, ...r })}, ${JSON.stringify({ best, daily: {} })})`).sort();
 
-test('liste : 20 succès, identifiants uniques, un succès caché', () => {
+test('liste : 22 succès, identifiants uniques, un succès caché', () => {
   const l = J(outil, 'ACH');
-  assert.equal(l.length, 20); assert.equal(new Set(l.map(a => a.id)).size, 20);
+  assert.equal(l.length, 22); assert.equal(new Set(l.map(a => a.id)).size, 22);
   assert.ok(l.some(a => a.hidden));
 });
 
@@ -56,7 +56,7 @@ test('mode assistance : succès d\'adresse refusés, progression et collection a
 test('vraie partie : succès débloqués à l\'arrivée, aucun en revoyant la partie', () => {
   const p = partieTerminee(), m = p.m;
   assert.deepEqual(debloques(m), ['medaille', 'premiere-lanterne']); // le robot a l'argent, 5 chutes
-  assert.ok(J(m, 'achListHtml()').includes('2 succès sur 20'));
+  assert.ok(J(m, 'achListHtml()').includes('2 succès sur 22'));
   const b = creerMoteur({ alea: mulberry(3) });
   b.ev(`startReplay(${JSON.stringify(p.m.ev('lastReplay'))}, () => {})`); b.pas(100);
   b.ev('const c = stats.combo; stats.combo = 4; killEnemy(enemies.find(e => !e.dead), 0); stats.combo = c'); // succès en cours de partie pendant le rejeu

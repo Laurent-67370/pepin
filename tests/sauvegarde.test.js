@@ -54,7 +54,7 @@ test('fichier piégé ou abîmé : refusé ou nettoyé', () => {
   const p = J(b, `save.profiles.find(p => p.id === 'piege-0123456789')`);
   assert.equal(p.name, 'Joueur 1'); assert.equal(p.color, 5); assert.equal(p.unlocked, 12);
   assert.deepEqual(Object.keys(p.best), ['0']);
-  assert.deepEqual(p.best[0], { time: 1, seeds: 0, gems: [true, false, true], medal: 3, score: 60000 });
+  assert.deepEqual(p.best[0], { time: 1, seeds: 0, gems: [true, false, true], gold: false, medal: 3, score: 60000 });
   assert.deepEqual(p.daily, { '2026-10-01': 60000 });
   assert.match(p.uid, /^[a-f0-9-]{16,40}$/i);
   assert.deepEqual(J(b, 'save.hof[0]').map(e => e.name), ['Bon']);

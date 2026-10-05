@@ -1,5 +1,5 @@
 /* Service worker de Pépin : jeu disponible hors ligne, mises à jour récupérées dès qu'il y a du réseau */
-const VERSION = 'pepin-1.5.8';
+const VERSION = 'pepin-1.5.9';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
