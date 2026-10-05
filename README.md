@@ -9,6 +9,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - 12 mondes : verger, racines, cime, forêt givrée, lac, nid du frelon, dunes, grotte de cristal, marais, volcan, nuages, citadelle
 - Des ennemis propres à chaque monde et 2 boss : le Grand Frelon et le Frelon Royal
 - 36 gouttes de rosée à trouver, 12 cachettes secrètes avec une graine d'or chacune (bas puis Saut sur le sol fissuré), 22 succès à débloquer (dont un caché)
+- Scène de fin après le Frelon Royal (Pépin prend racine sur sa colline), générique avec le bilan du voyage ; « Revoir la fin » au menu
 - Carte du monde, médailles de temps (bronze, argent, or) par monde
 - Mode assistance (vitesse réduite, invincibilité, double saut), mode classique avec vies limitées, qualité graphique automatique
 - Tactile : joystick flottant, saut sur toute la moitié droite, bouton Élan
@@ -29,6 +30,7 @@ Jeu de plateforme original en HTML5, jouable au doigt, au clavier ou à la manet
 - `node --test tests/fantome.test.js` vérifie la trajectoire du fantôme, son rythme, et qu'il n'influence jamais la partie.
 - `node --test tests/verif.test.js` vérifie que le serveur valide une partie honnête et repère score, temps, entrées, assistance ou graine du défi falsifiés.
 - `node --test tests/secrets.test.js` vérifie dans le vrai moteur, pour chacun des 12 mondes, qu'on tient sur la trappe, qu'on descend dans la cachette, qu'on ramasse la graine d'or et qu'on ressort.
+- `node --test tests/fin.test.js` vérifie la scène de fin : proposée après le dernier monde, passable, sans effet sur la partie, retenue par joueur.
 - `node --test tests/sauvegarde.test.js` teste l'export et l'import de la sauvegarde (fusion, fichiers piégés) et le partage du score.
 - `node --test tests/succes.test.js` vérifie les conditions des 20 succès, et qu'aucun ne se débloque en rejeu ni, pour l'adresse, en mode assistance.
 

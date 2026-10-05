@@ -246,6 +246,7 @@ body.has-touch.playing #touch{display:block;}
         <button class="btn" data-act="daily" id="dailyBtn">Défi du jour</button>
         <button class="btn" data-act="scores">Meilleurs scores</button>
         <button class="btn" data-act="ach" id="achBtn">Succès</button>
+        <button class="btn" data-act="ending" id="endBtn" hidden>Revoir la fin</button>
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="quit">Quitter le jeu</button>
         <button class="btn" data-act="install" id="btnInstall" hidden>Installer le jeu sur cet appareil</button>
@@ -481,7 +482,10 @@ const SONGS = [
     bass: [55,0,62,0, 55,0,62,0, 52,0,59,0, 52,0,59,0, 48,0,55,0, 50,0,57,0, 50,0,57,0, 55,0,55,0] },
   { tempo: 154, leadType: 'square', hat: true,
     lead: [62,0,65,0, 69,0,68,0, 65,0,62,0, 61,0,62,0, 62,0,65,0, 70,0,69,0, 65,68,0,65, 64,0,61,0],
-    bass: [38,38,50,38, 38,50,38,0, 34,34,46,34, 34,46,34,0, 36,36,48,36, 36,48,36,0, 37,37,49,37, 40,0,37,0] }
+    bass: [38,38,50,38, 38,50,38,0, 34,34,46,34, 34,46,34,0, 36,36,48,36, 36,48,36,0, 37,37,49,37, 40,0,37,0] },
+  { tempo: 84, leadType: 'triangle', hat: false, // fin du voyage
+    lead: [72,0,76,0, 79,0,0,0, 74,0,79,0, 74,0,0,0, 76,0,79,0, 84,0,0,0, 81,0,77,0, 72,0,0,0],
+    bass: [48,0,0,0, 55,0,0,0, 43,0,0,0, 50,0,0,0, 45,0,0,0, 52,0,0,0, 41,0,0,0, 48,0,0,0] }
 ];
 const mus = { song: null, idx: -1, step: 0, next: 0, timer: null, pending: null };
 const mf = n => 440 * Math.pow(2, (n - 69) / 12);
@@ -1587,6 +1591,7 @@ function update() {
   pollInput();
   globalT++;
   if (input.pausePressed) { if (state === 'play') { openPause(); return; } else if (state === 'pause') { resumeGame(); return; } }
+  if (state === 'ending') { updateEnding(); return; }
   if (state === 'menu') {
     cam.x += 0.4; if (cam.x > L.w * T - VW) cam.x = 0;
     cam.y = maxCamY();
@@ -2963,7 +2968,8 @@ function showResults() {
   const btns = document.getElementById('rButtons'); btns.innerHTML = '';
   const add = (label, fn, primary) => { const b = document.createElement('button'); b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = () => { SFX.click(); fn(); }; btns.appendChild(b); };
   if (!last) add('Monde suivant', () => startLevel(i + 1), true);
-  add('Rejouer ce monde', () => startLevel(i), last);
+  if (last) add('Voir la fin du voyage', startEnding, true);
+  add('Rejouer ce monde', () => startLevel(i), false);
   addReplayBtn(add);
   add('Retour au menu', goMenu);
   panelStack = []; showPanel('results');
@@ -3047,6 +3053,7 @@ overlay.addEventListener('click', e => {
   else if (a === 'quit') quitGame();
   else if (a === 'scores') { renderScores(); showPanel('scores'); }
   else if (a === 'ach') { renderAch(); showPanel('ach'); }
+  else if (a === 'ending') startEnding();
   else if (a === 'profiles') { renderProfiles(); showPanel('profiles'); }
   else if (a === 'daily') { renderDaily(); showPanel('daily'); }
   else if (a === 'dailyGo') startLevel(dailyWorld(todayStr()), true);
@@ -3061,7 +3068,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.5.9';
+const APP_VERSION = '1.6.0';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -3087,7 +3094,7 @@ if (backNav) addEventListener('popstate', () => {
   backArmed = false;
   if (state === 'play') { openPause(); armBack(); }
   else if (state === 'pause') { resumeGame(); armBack(); }
-  else if (state === 'results') goMenu();
+  else if (state === 'results' || state === 'ending') goMenu();
   else if (panelStack.length > 1) { back(); if (panelStack[panelStack.length - 1] !== 'title') armBack(); }
 });
 function quitGame() {
@@ -3125,7 +3132,7 @@ function cleanProfile(p, i) {
   const name = typeof p.name === 'string' && /^[\p{L}\p{N} _.'-]{2,12}$/u.test(p.name.trim()) ? p.name.trim() : 'Joueur ' + (i + 1);
   const ach = {}; // succès : seulement des identifiants connus, avec leur date
   for (const [id, t] of Object.entries(p.ach || {})) if (ACH_BY_ID[id] && Number.isFinite(t)) ach[id] = t;
-  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily, ach,
+  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily, ach, ...(p.endSeen === true ? { endSeen: true } : {}),
     uid: typeof p.uid === 'string' && /^[a-f0-9-]{16,40}$/i.test(p.uid) ? p.uid : newUid() };
 }
 /* Fusionne une sauvegarde importée : profils ajoutés ou remplacés (même identifiant), tableaux d'honneur réunis,
@@ -3341,7 +3348,8 @@ function achListHtml(p = prof()) {
   }).join('') + '</div>';
 }
 function renderAch() { document.getElementById('achBox').innerHTML = achListHtml(); }
-function updateAchBtn() { const a = achOf(); document.getElementById('achBtn').textContent = `Succès (${ACH.filter(x => a[x.id]).length}/${ACH.length})`; }
+function updateEndBtn() { const b = document.getElementById('endBtn'); if (b) b.hidden = !prof().endSeen; }
+function updateAchBtn() { updateEndBtn(); const a = achOf(); document.getElementById('achBtn').textContent = `Succès (${ACH.filter(x => a[x.id]).length}/${ACH.length})`; }
 
 /* Réglages */
 const S = { ghost: 'sGhost', online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
@@ -3375,13 +3383,144 @@ function watchPerf(dt) {
   Q.ema += (dt - Q.ema) * 0.05;
   if (Q.ema > 21 && Q.level < 2) { if (++Q.slow > 120) { Q.level++; Q.slow = 0; Q.ema = 16.7; applyQuality(); layout(); } } else Q.slow = 0;
 }
+/* =========================================================
+   Scène de fin : après le Frelon Royal, Pépin gravit sa colline, y prend racine et devient un arbre
+   dont s'envolent de nouvelles graines voyageuses. Puis le générique, avec le bilan du voyage.
+   Aucune logique de jeu ici : tout se calcule à partir du temps écoulé, endingT.
+   ========================================================= */
+const END_CREDITS = 1120, END_HOLD = 1120 + 760;
+let endingT = 0, endingData = null, endingSkipAt = -999;
+function startEnding() {
+  const p = prof(); p.endSeen = true; persist();
+  const best = save.best || {}, ks = Object.keys(best).filter(k => best[k]);
+  endingData = {
+    score: totalHS(), gems: ks.reduce((n, k) => n + (best[k].gems || []).filter(Boolean).length, 0),
+    gold: ks.filter(k => best[k].gold).length, ach: ACH.filter(x => (p.ach || {})[x.id]).length,
+    golds: LEVELS.map((_, i) => !!(best[i] && best[i].gold)), name: save.playerName && save.playerName !== 'Joueur 1' ? save.playerName : ''
+  };
+  rec = null; ghost = null; replay = null; dailyRun = null; particles = []; ambient.length = 0; // ni particules ni décor du dernier monde
+  hidePanels(); document.body.classList.remove('playing'); releaseAllTouch(); armBack();
+  state = 'ending'; endingT = 0; endingSkipAt = -999; playSong(13);
+}
+/* Toucher ou appuyer : d'abord on passe au générique final, ensuite on revient au menu */
+function endingSkip() {
+  if (state !== 'ending' || globalT - endingSkipAt < 30) return; // un toucher déclenche aussi un saut : un seul effet par demi-seconde
+  endingSkipAt = globalT;
+  if (endingT < END_HOLD) endingT = END_HOLD; else goMenu();
+}
+function updateEnding() { endingT++; updateParticles(); if (input.jumpPressed || input.dashPressed) endingSkip(); }
+addEventListener('pointerdown', () => { if (state === 'ending') endingSkip(); });
+addEventListener('keydown', e => { if (state === 'ending' && (e.key === 'Enter' || e.key === 'Escape')) endingSkip(); });
+
+const ease = (t, a, b) => { const k = clamp((t - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
+function renderEnding() {
+  const t = endingT, W = VW, H = VH, cx = Math.round(W * 0.5), gy = Math.round(H * 0.7);
+  const hillY = x => gy + ((x - cx) / (W * 0.55)) ** 2 * 46;
+  ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.imageSmoothingEnabled = false;
+  // Ciel du soir qui s'assombrit doucement
+  const dusk = ease(t, 0, 1400), sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, dusk > 0.5 ? '#1e1a3c' : '#3a2c5c'); sky.addColorStop(0.55, '#c0687a'); sky.addColorStop(1, '#ffc88a');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = `rgba(20,14,40,${0.35 * dusk})`; ctx.fillRect(0, 0, W, H);
+  // Étoiles
+  for (let k = 0; k < 40; k++) {
+    const sx = (k * 97) % W, sy = (k * 53) % Math.round(H * 0.45), tw = 0.5 + 0.5 * Math.sin(t * 0.05 + k);
+    ctx.fillStyle = `rgba(255,245,220,${ease(t, 200 + k * 10, 500 + k * 10) * (0.4 + 0.5 * tw)})`; ctx.fillRect(sx, sy, 1, 1);
+  }
+  // Soleil couchant
+  const sunY = H * 0.6 + ease(t, 0, 1400) * 26;
+  glow(W * 0.76, sunY, 70, 'rgba(255,190,110,0.9)', 0.55);
+  ctx.fillStyle = '#ffe3a6'; ctx.beginPath(); ctx.arc(W * 0.76, sunY, 16, 0, Math.PI * 2); ctx.fill();
+  // Les douze lanternes montent dans le ciel ; celles des mondes où la graine d'or a été trouvée brillent davantage
+  const golds = (endingData && endingData.golds) || [];
+  for (let i = 0; i < 12; i++) {
+    const a0 = 320 + i * 26, k = ease(t, a0, a0 + 260); if (k <= 0) continue;
+    const fx = W * (0.1 + 0.8 * ((i * 5) % 12) / 11), fy = H * (0.12 + 0.22 * ((i * 7) % 5) / 4);
+    const lx = cx + (fx - cx) * k, ly = gy - 10 + (fy - gy + 10) * k + Math.sin(t * 0.04 + i) * 1.5;
+    glow(lx, ly, golds[i] ? 14 : 9, golds[i] ? 'rgba(255,205,70,0.95)' : 'rgba(255,230,170,0.8)', golds[i] ? 0.7 : 0.45);
+    ctx.fillStyle = golds[i] ? '#ffd34d' : '#ffe9b8'; ctx.fillRect(Math.round(lx) - 1, Math.round(ly) - 1, 3, 3);
+  }
+  // Collines lointaines
+  ctx.fillStyle = '#5a4a78';
+  ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W; x += 8) ctx.lineTo(x, H * 0.66 + Math.sin(x * 0.03) * 8 + Math.sin(x * 0.011) * 10); ctx.lineTo(W, H); ctx.fill();
+  // Pépin gravit la colline, s'arrête au sommet, puis s'enfonce dans la terre
+  const walk = ease(t, 60, 300), px = -16 + (cx - -16) * walk, sink = ease(t, 430, 560) * 22;
+  if (t < 600) {
+    const img = renderPep({ t, ph: t * 0.22, moving: t > 60 && t < 300, air: false, vy: 0, blink: (t % 180) < 6, mood: t > 300 ? 'happy' : 'normal', leafA: 0, leafS: 0.45, leafBig: false });
+    ctx.save(); ctx.translate(Math.round(px), Math.round(hillY(px) + sink)); ctx.drawImage(img, -8, -19.5, 16, 20); ctx.restore();
+    if (t > 430 && t < 560 && t % 12 === 0) puff(cx + (t % 24 ? -6 : 6), gy, 3, '#8a5a34', 0.8, 0.3);
+  }
+  // Colline principale (devant Pépin : il disparaît dedans en s'enfonçant)
+  const hill = ctx.createLinearGradient(0, gy - 10, 0, H); hill.addColorStop(0, '#5fae3e'); hill.addColorStop(1, '#2f6a2a');
+  ctx.fillStyle = hill; ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W; x += 4) ctx.lineTo(x, hillY(x)); ctx.lineTo(W, H); ctx.fill();
+  ctx.fillStyle = '#a8e27a'; for (let x = 0; x <= W; x += 4) ctx.fillRect(x, Math.round(hillY(x)), 4, 1);
+  drawParticles();
+  // La pousse, puis l'arbre
+  const sprout = ease(t, 560, 640), trunk = ease(t, 640, 820), crown = ease(t, 760, 940), bloom = ease(t, 900, 1000);
+  if (sprout > 0 && trunk < 1) {
+    ctx.fillStyle = '#3f8f34'; ctx.fillRect(cx, gy - 6 * sprout, 1, 6 * sprout);
+    ctx.fillStyle = '#6cc04a'; ctx.fillRect(cx - 3 * sprout, gy - 6 * sprout - 1, 3 * sprout, 2); ctx.fillRect(cx + 1, gy - 6 * sprout - 2, 3 * sprout, 2);
+  }
+  if (trunk > 0) {
+    const th = 52 * trunk, tw = 2 + 4 * trunk;
+    ctx.fillStyle = '#6b4226'; ctx.fillRect(Math.round(cx - tw / 2), Math.round(gy - th), Math.round(tw), Math.round(th) + 2);
+    ctx.fillStyle = '#8a5a34'; ctx.fillRect(Math.round(cx - tw / 2), Math.round(gy - th), 1, Math.round(th));
+    if (trunk > 0.6) { ctx.fillStyle = '#6b4226'; const b = (trunk - 0.6) / 0.4; ctx.fillRect(cx, Math.round(gy - th * 0.7), Math.round(12 * b), 2); ctx.fillRect(Math.round(cx - 11 * b), Math.round(gy - th * 0.55), Math.round(11 * b), 2); }
+    const blobs = [[0, -58, 20], [-15, -50, 15], [15, -50, 15], [-8, -66, 13], [9, -67, 13], [0, -44, 14]];
+    for (const [bx, by, r] of blobs) { ctx.fillStyle = '#3f8f34'; ctx.beginPath(); ctx.arc(cx + bx, gy + by, r * crown, 0, Math.PI * 2); ctx.fill(); }
+    for (const [bx, by, r] of blobs) { ctx.fillStyle = '#6cc04a'; ctx.beginPath(); ctx.arc(cx + bx - 2, gy + by - 2, r * crown * 0.72, 0, Math.PI * 2); ctx.fill(); }
+    for (let k = 0; k < 18; k++) { // fleurs
+      if (bloom * 18 <= k) break;
+      const fx = cx + Math.round(Math.sin(k * 2.4) * 22), fy = gy - 56 + Math.round(Math.cos(k * 1.7) * 14);
+      ctx.fillStyle = k % 3 ? '#ffb6c8' : '#fff3dc'; ctx.fillRect(fx, fy, 2, 2);
+    }
+  }
+  // De nouvelles graines s'envolent avec le vent
+  for (let k = 0; k < 7; k++) {
+    const a0 = 980 + k * 22, f = (t - a0) / 260; if (f <= 0 || f >= 1) continue;
+    const sx = cx + Math.sin(k * 2.4) * 18 + f * (W * 0.7), sy = gy - 56 + Math.cos(k * 1.7) * 12 - f * 60 + Math.sin(f * 12 + k) * 6;
+    ctx.globalAlpha = 1 - f * f; ctx.fillStyle = '#c38a4a'; ctx.fillRect(Math.round(sx), Math.round(sy), 3, 3);
+    ctx.fillStyle = '#6cc04a'; ctx.fillRect(Math.round(sx) - 1, Math.round(sy) - 2, 2, 1); ctx.fillRect(Math.round(sx) + 2, Math.round(sy) - 2, 2, 1); ctx.globalAlpha = 1;
+  }
+  // Fondu d'entrée
+  if (t < 60) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 60})`; ctx.fillRect(0, 0, W, H); }
+  // Générique : la scène s'assombrit derrière le texte
+  const cr = ease(t, END_CREDITS, END_CREDITS + 90);
+  if (cr > 0) { ctx.fillStyle = `rgba(16,10,24,${0.62 * cr})`; ctx.fillRect(0, 0, W, H); }
+  dctx.imageSmoothingEnabled = false;
+  dctx.drawImage(buf, 0, 0, cvs.width, cvs.height);
+  // Textes, nets, à la résolution de l'écran
+  const u = cvs.height / VH, mid = cvs.width / 2;
+  const caption = (txt, a, b) => {
+    const al = Math.min(ease(t, a, a + 40), 1 - ease(t, b - 40, b)); if (al <= 0) return;
+    dctx.globalAlpha = al; dctx.font = `600 ${Math.round(9 * u)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
+    wrap(txt, cvs.width * 0.86).forEach((l, k) => hudText(l, mid, 16 * u + k * 12 * u, 9 * u, 'center')); dctx.globalAlpha = 1;
+  };
+  caption('Après douze mondes, la graine voyageuse a trouvé sa colline.', 90, 420);
+  caption('Elle y prend racine…', 450, 760);
+  caption('…et un jour, ses graines partiront à leur tour.', 800, END_CREDITS);
+  if (cr > 0) {
+    const d = endingData || {}, fin = t >= END_HOLD;
+    const lines = [['Pépin, la graine voyageuse', 13], ['', 6], ['Un jeu de Laurent', 9], ['Pixel art, musique et bruitages créés par le code', 7], ['', 8],
+      [d.name ? `Le voyage de ${d.name}` : 'Ton voyage', 9], [`Score total : ${fmtNum(d.score || 0)}`, 8], [`Gouttes de rosée : ${d.gems || 0}/36`, 8],
+      [`Graines d'or : ${d.gold || 0}/12`, 8], [`Succès : ${d.ach || 0}/${ACH.length}`, 8], ['', 8], ['Merci d\'avoir joué !', 11]];
+    const total = lines.reduce((n, [, sz]) => n + sz * 1.55 * u, 0);
+    const start = cvs.height + 10 * u, stop = (cvs.height - total) / 2 - 6 * u;
+    let y = fin ? stop : Math.max(stop, start - (t - END_CREDITS) * 0.42 * u);
+    dctx.globalAlpha = cr;
+    for (const [txt, sz] of lines) { if (txt) hudText(txt, mid, y, sz * u, 'center', sz >= 11 ? '#ffd34d' : '#fff3dc'); y += sz * 1.55 * u; }
+    if (fin && (t >> 5) % 2 === 0) hudText('Touche l\'écran pour revenir au menu', mid, cvs.height - 16 * u, 7 * u, 'center', '#d6b98f');
+    dctx.globalAlpha = 1;
+  }
+}
+
 function frame(now) {
   let dt = Math.min(100, now - last); last = now; acc += dt;
   watchPerf(dt);
   const step = 1000 / 60 / (parseFloat(save.settings.speed) || 1); let n = 0;
   while (acc >= step && n < 5) { update(); acc -= step; n++; }
   if (n === 5) acc = 0;
-  withInterp(Math.min(1, acc / step), render);
+  withInterp(Math.min(1, acc / step), state === 'ending' ? renderEnding : render);
   requestAnimationFrame(frame);
 }
 applyQuality();
