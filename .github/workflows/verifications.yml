@@ -36,6 +36,8 @@ jobs:
         run: node --test tests/fin.test.js
       - name: Monde 13 (Jardin d'or)
         run: node --test tests/monde13.test.js
+      - name: Aide, astuces en jeu et textes
+        run: node --test tests/aide.test.js
       - name: Succès
         run: node --test tests/succes.test.js
 

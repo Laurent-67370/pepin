@@ -145,6 +145,24 @@ body.has-touch.playing #touch{display:block;}
 .btn:focus-visible{outline:3px solid var(--amber);outline-offset:3px;}
 .btn.primary{background:var(--amber);color:#2a1a12;font-size:24px;}
 .btn[disabled]{opacity:.45;cursor:not-allowed;}
+.helpCard{background:linear-gradient(#fffaf0,#f7e6c4);border:3px solid #2a1a12;border-radius:14px;padding:10px 12px 12px;box-shadow:0 4px 0 rgba(42,26,18,.25);touch-action:pan-y;}
+.helpCard canvas{display:block;width:100%;aspect-ratio:16/9;border-radius:9px;border:2px solid #2a1a12;image-rendering:pixelated;background:#9fd8e6;}
+.helpCard h3{font-size:22px;margin:10px 0 2px;color:var(--leaf-d);}
+.helpCard p{font-size:15px;line-height:1.45;margin:0;}
+.keys{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+.keys .key{display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:14px;}
+.keys .lab{min-width:58px;font-weight:700;color:#c25a12;}
+kbd{display:inline-block;min-width:22px;padding:2px 7px;border:2px solid #2a1a12;border-bottom-width:4px;border-radius:7px;background:#fff;font:600 14px "Pixelify Sans",sans-serif;text-align:center;color:#2a1a12;}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;background:#2a1a12;color:#fff3dc;font-size:13px;font-weight:600;}
+.helpNav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;}
+.helpNav .btn{flex:0 0 auto;min-width:0;width:auto;padding:10px 16px;}
+.dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
+.dots button{width:11px;height:11px;border-radius:50%;border:2px solid #2a1a12;background:transparent;padding:0;cursor:pointer;}
+.dots button.on{background:#e8952f;}
+.seg{display:flex;gap:6px;justify-content:center;margin:2px 0 10px;flex-wrap:wrap;}
+.seg button{border:2px solid #2a1a12;border-radius:999px;background:#fff3dc;padding:3px 12px;font:600 13px "Pixelify Sans",sans-serif;cursor:pointer;color:#2a1a12;}
+.seg button.on{background:#2a1a12;color:#fff3dc;}
+.linkish{background:none;border:none;color:var(--muted);text-decoration:underline;font:inherit;cursor:pointer;padding:0;}
 .hint{margin-top:18px;font-size:14px;line-height:1.45;color:var(--muted);}
 .row2{display:flex;gap:10px;}
 .row2 .btn{flex:1;text-align:center;}
@@ -243,6 +261,7 @@ body.has-touch.playing #touch{display:block;}
       <div class="stack">
         <button class="btn primary" data-act="play">Jouer</button>
         <button class="btn" data-act="levels">Carte du monde</button>
+        <button class="btn" data-act="help" id="helpBtn">Comment jouer</button>
         <button class="btn" data-act="daily" id="dailyBtn">Défi du jour</button>
         <button class="btn" data-act="scores">Meilleurs scores</button>
         <button class="btn" data-act="ach" id="achBtn">Succès</button>
@@ -286,6 +305,7 @@ body.has-touch.playing #touch{display:block;}
       <label class="set"><span>Assistance : sauts faciles<small style="display:block;font-size:13px;color:var(--muted)">Double saut, et saut accepté plus longtemps au bord du vide.</small></span><input type="checkbox" id="sEasyJump"></label>
       <label class="set"><span>Mode classique<small style="display:block;font-size:13px;color:var(--muted)">3 vies par monde, Game Over possible. Pris en compte au prochain monde.</small></span><input type="checkbox" id="sClassic"></label>
       <label class="set"><span>Fantôme du meilleur temps<small style="display:block;font-size:13px;color:var(--muted)">Ta meilleure partie du monde court à côté de toi, en transparence.</small></span><input type="checkbox" id="sGhost"></label>
+      <label class="set"><span>Astuces en jeu<small style="display:block;font-size:13px;color:var(--muted)">Une courte bulle explique chaque nouveauté la première fois.</small></span><input type="checkbox" id="sTips"></label>
       <h3 class="setHead">Sauvegarde</h3>
       <p class="sub" style="margin-top:0">Pour changer d'appareil, ou te protéger si le navigateur efface ses données.</p>
       <div class="stack"><button class="btn" data-act="export">Exporter ma progression</button><button class="btn" data-act="import">Importer une sauvegarde</button></div>
@@ -300,6 +320,7 @@ body.has-touch.playing #touch{display:block;}
       <p class="sub" id="pauseInfo"></p>
       <div class="stack">
         <button class="btn primary" data-act="resume">Reprendre</button>
+        <button class="btn" data-act="help">Comment jouer</button>
         <button class="btn" data-act="restart">Recommencer le monde</button>
         <button class="btn" data-act="settings">Réglages</button>
         <button class="btn" data-act="fullscreen" id="btnFs">Plein écran</button>
@@ -324,6 +345,19 @@ body.has-touch.playing #touch{display:block;}
       <div class="stack" style="margin-top:14px"><button class="btn" data-act="back">Retour</button></div>
     </section>
 
+    <section id="pHelp" class="panel wide" aria-label="Comment jouer">
+      <h2>Comment jouer</h2>
+      <div class="seg" id="helpSeg" role="group" aria-label="Commandes affichées"></div>
+      <div class="helpCard" id="helpCard">
+        <canvas id="helpCv" width="320" height="180" aria-hidden="true"></canvas>
+        <h3 id="helpTitle"></h3>
+        <p id="helpText"></p>
+        <div class="keys" id="helpKeys"></div>
+      </div>
+      <div class="helpNav"><button class="btn" id="helpPrev" aria-label="Fiche précédente">◀</button><div class="dots" id="helpDots"></div><button class="btn primary" id="helpNext">Suivant ▶</button></div>
+      <p class="hint" style="text-align:center"><button class="linkish" id="helpTips">Revoir les astuces en jeu</button><span id="helpTipsMsg"></span></p>
+      <div class="stack" style="margin-top:8px"><button class="btn" data-act="back">Fermer</button></div>
+    </section>
     <section id="pAch" class="panel">
       <h2>Succès</h2>
       <div id="achBox"></div>
@@ -363,7 +397,7 @@ let VW = 384;
 const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const SAVE_KEY = 'pepin-save-v1';
-let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false, online: true, ghost: true }, hof: {}, playerName: '', deviceId: '' };
+let save = { unlocked: 1, best: {}, settings: { size: 1, opacity: 0.6, lefty: false, haptics: true, music: true, sfx: true, stick: 'float', classic: false, quality: 'auto', speed: '1', invincible: false, easyJump: false, online: true, ghost: true, tips: true }, hof: {}, playerName: '', deviceId: '' };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (s) save = { ...save, ...s, settings: { ...save.settings, ...(s.settings || {}) } };
@@ -1359,7 +1393,7 @@ function loadLevel(i, seed, forced) {
   const b = Builder(def.w); def.build(b); if (def.secret) b.secret(...def.secret);
   TH = THEMES[def.theme]; TILES = buildTiles(TH); skyCache = null;
   L = { def, w: def.w, g: b.g, ceil: !!def.ceil };
-  enemies = []; items = []; movers = []; springs = []; checkpoints = []; particles = []; ghosts = []; texts = []; goal = null;
+  enemies = []; items = []; movers = []; springs = []; checkpoints = []; particles = []; ghosts = []; texts = []; goal = null; tipShow = null;
   let seeds = 0, crates = 0, gemIdx = 0; boss = null; shots = []; L.lock = null;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < L.w; x++) {
     const c = L.g[y][x]; let clear = true;
@@ -1627,6 +1661,7 @@ function update() {
   if (state === 'pause' || state === 'results') return;
   if (state === 'gameover') { fadeT++; if (fadeT === 70) showGameOver(); updateParticles(); return; }
   if (replay) replayTick(); else if (rec) recTick(); // un pas de logique = un code enregistré ou rejoué
+  checkTips();
   if (ghost) ghost.t++;
   if (state === 'play') { stats.time++; if (stats.time % 30 === 0 && assistOn()) stats.assistUsed = true; }
   if (introT > 0) introT--;
@@ -2095,7 +2130,7 @@ function updateParticles() {
   for (const q of particles) { q.x += q.vx; q.y += q.vy; q.vy += q.g; q.vx *= 0.98; q.life--; }
   particles = particles.filter(q => q.life > 0);
   for (const g of ghosts) g.life--; ghosts = ghosts.filter(g => g.life > 0);
-  for (const t of texts) { t.life--; t.y -= 0.35; } texts = texts.filter(t => t.life > 0);
+  for (const t of texts) { t.life--; t.y -= 0.35; t.age = (t.age || 0) + 1; } texts = texts.filter(t => t.life > 0);
 }
 function updateCamera() {
   const look = P.face * 26 + P.vx * 6;
@@ -2635,12 +2670,29 @@ function render() {
 }
 
 /* HUD net, dessiné à la résolution de l'écran */
-function hudText(txt, x, y, size, align = 'left', col = '#fff3dc') {
-  dctx.font = `600 ${Math.round(size)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
-  dctx.textAlign = align; dctx.textBaseline = 'top';
-  dctx.lineJoin = 'round'; dctx.lineWidth = Math.max(2, size * 0.28); dctx.strokeStyle = '#2a1a12';
-  dctx.strokeText(txt, x, y); dctx.fillStyle = col; dctx.fillText(txt, x, y);
+/* Textes de l'écran : ombre portée douce, contour brun, et pour les grands textes un dégradé clair → couleur */
+function hudText(txt, x, y, size, align = 'left', col = '#fff3dc', rim) {
+  dctx.font = `${size >= 13 * cvs.height / VH ? 700 : 600} ${Math.round(size)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
+  dctx.textAlign = align; dctx.textBaseline = 'top'; dctx.lineJoin = 'round';
+  const lw = Math.max(2, size * 0.28);
+  dctx.lineWidth = lw; dctx.strokeStyle = 'rgba(20,10,8,.45)'; dctx.strokeText(txt, x, y + Math.max(1, size * 0.1));
+  dctx.strokeStyle = '#2a1a12'; dctx.strokeText(txt, x, y);
+  if (rim) { dctx.lineWidth = lw * 0.45; dctx.strokeStyle = rim; dctx.strokeText(txt, x, y); }
+  if (size >= 11 * cvs.height / VH) { const g = dctx.createLinearGradient(0, y, 0, y + size); g.addColorStop(0, '#fffbea'); g.addColorStop(0.55, col); g.addColorStop(1, col); dctx.fillStyle = g; }
+  else dctx.fillStyle = col;
+  dctx.fillText(txt, x, y);
 }
+/* Style des textes flottants selon le message : points, bonne nouvelle, alerte, conseil */
+function floatStyle(txt) {
+  if (/^[+×x]?\s?\d|^\+|^x\d/.test(txt)) return { col: '#ffd34d', rim: '#c76a12', size: /\d{4}/.test(txt) ? 10 : 7 };
+  if (/fuit|accélère|coup|s'envole/.test(txt)) return { col: '#ffd0b8', rim: '#b8402a', size: 8.5 };
+  if (/Feuille :|plane/.test(txt)) return { col: '#e6f6ff', rim: '#2a8fbf', size: 7.5 };
+  return { col: '#fff3dc', rim: '#3f8f34', size: 8.5 };
+}
+const easeOutBack = k => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+/* Mots des commandes, mis en couleur dans les bulles des panneaux */
+const KEYWORDS = /^(?:[ldLD]['’])?(Saut|Sauter|saute|Élan|élan|Bas|bas|Pause|maintiens|Maintiens|ressort|lanterne|rosée|rosées|graines?|feuille)[.,…!?:;]*$/; // « l'Élan » compris
+function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function fmtTime(fr) { const s = fr / 60, m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r < 10 ? '0' : ''}${r.toFixed(1)}`; }
 function wrap(txt, maxW) {
   const words = txt.split(' '), lines = []; let line = '';
@@ -2667,30 +2719,50 @@ function drawHUD() {
   if (bossIntroT > 0) { bossIntroT--; dctx.globalAlpha = Math.min(1, bossIntroT / 20); hudText('Attention !', cvs.width / 2, cvs.height * 0.42, 16 * u, 'center', '#ffcf3a'); dctx.globalAlpha = 1; }
   // textes flottants
   for (const t of texts) {
+    const st = floatStyle(t.txt), age = t.age || 0, pop = age < 12 ? 0.5 + 0.5 * easeOutBack(age / 12) : 1;
     dctx.globalAlpha = Math.min(1, t.life / 25);
-    hudText(t.txt, (t.x - cam.x) * u, (t.y - cam.y) * u - 6 * u, 7 * u, 'center', '#ffe08a');
+    hudText(t.txt, (t.x - cam.x) * u, (t.y - cam.y) * u - 6 * u - (1 - Math.min(1, pop)) * 4 * u, st.size * u * pop, 'center', st.col, st.rim);
   }
   dctx.globalAlpha = 1;
   // bulles des panneaux
   if (state === 'play') for (const sg of signs) {
-    if (Math.abs(P.x + P.w / 2 - (sg.x + 8)) < 34 && Math.abs(P.y - sg.y) < 48) {
-      const fs = 7.5 * u; dctx.font = `600 ${Math.round(fs)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
-      const lines = wrap(sg.txt, Math.min(cvs.width * 0.55, 190 * u));
-      const w = Math.max(...lines.map(l => dctx.measureText(l).width)) + 14 * u, h = lines.length * fs * 1.25 + 10 * u;
-      let bx = (sg.x + 8 - cam.x) * u - w / 2; bx = clamp(bx, 6 * u, cvs.width - w - 6 * u);
-      const by = (sg.y - cam.y) * u - h - 8 * u;
-      dctx.fillStyle = '#2a1a12'; dctx.fillRect(bx - 2 * u, by - 2 * u, w + 4 * u, h + 4 * u);
-      dctx.fillStyle = '#fff3dc'; dctx.fillRect(bx, by, w, h);
-      dctx.fillStyle = '#2a1a12'; dctx.textAlign = 'left'; dctx.textBaseline = 'top';
-      lines.forEach((l, i) => dctx.fillText(l, bx + 7 * u, by + 5 * u + i * fs * 1.25));
-    }
+    const near = Math.abs(P.x + P.w / 2 - (sg.x + 8)) < 34 && Math.abs(P.y - sg.y) < 48;
+    sg.a = clamp((sg.a || 0) + (near ? 0.12 : -0.15), 0, 1); if (sg.a <= 0) continue;
+    const k = easeOutBack(sg.a), fs = 7.5 * u; dctx.font = `600 ${Math.round(fs)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
+    const lines = wrap(sg.txt, Math.min(cvs.width * 0.6, 200 * u));
+    const w = Math.max(...lines.map(l => dctx.measureText(l).width)) + 16 * u, h = lines.length * fs * 1.3 + 11 * u;
+    const ax = (sg.x + 8 - cam.x) * u; let bx = clamp(ax - w / 2, 6 * u, cvs.width - w - 6 * u);
+    const by = (sg.y - cam.y) * u - h - 11 * u + (1 - k) * 6 * u, r = 5 * u;
+    dctx.save(); dctx.globalAlpha = Math.min(1, sg.a * 1.4);
+    dctx.translate(ax, by + h); dctx.scale(0.85 + 0.15 * k, 0.85 + 0.15 * k); dctx.translate(-ax, -(by + h));
+    dctx.fillStyle = 'rgba(20,10,8,.3)'; roundRect(dctx, bx + 2 * u, by + 3 * u, w, h, r); dctx.fill(); // ombre
+    const tx = clamp(ax, bx + r + 6 * u, bx + w - r - 6 * u); // pointe vers le panneau
+    dctx.beginPath(); dctx.moveTo(tx - 6 * u, by + h - 1); dctx.lineTo(tx, by + h + 7 * u); dctx.lineTo(tx + 6 * u, by + h - 1); dctx.closePath();
+    dctx.fillStyle = '#2a1a12'; dctx.fill();
+    dctx.lineWidth = 3 * u; dctx.strokeStyle = '#2a1a12'; roundRect(dctx, bx, by, w, h, r); dctx.stroke();
+    const pg = dctx.createLinearGradient(0, by, 0, by + h); pg.addColorStop(0, '#fffaf0'); pg.addColorStop(1, '#f7e6c4');
+    dctx.fillStyle = pg; dctx.fill();
+    dctx.beginPath(); dctx.moveTo(tx - 4 * u, by + h - 2 * u); dctx.lineTo(tx, by + h + 4 * u); dctx.lineTo(tx + 4 * u, by + h - 2 * u); dctx.closePath(); dctx.fillStyle = '#f7e6c4'; dctx.fill();
+    dctx.fillStyle = 'rgba(255,255,255,.7)'; dctx.fillRect(bx + r, by + 2 * u, w - 2 * r, Math.max(1, u * 0.8)); // reflet
+    dctx.textAlign = 'left'; dctx.textBaseline = 'top';
+    lines.forEach((l, i) => { // mot par mot : les commandes ressortent en couleur
+      let x = bx + 8 * u; const y = by + 5.5 * u + i * fs * 1.3;
+      for (const wd of l.split(' ')) { dctx.fillStyle = KEYWORDS.test(wd) ? '#c25a12' : '#2a1a12'; dctx.fillText(wd, x, y); x += dctx.measureText(wd + ' ').width; }
+    });
+    dctx.restore();
   }
+  drawTip(u);
   // carton d'introduction
   if (introT > 0 && state !== 'results') {
     const a = Math.min(1, introT / 30, (170 - introT) / 20);
     dctx.globalAlpha = Math.max(0, a);
-    hudText(L.def.sub, cvs.width / 2, cvs.height * 0.3, 10 * u, 'center', '#ffe08a');
-    hudText(L.def.name, cvs.width / 2, cvs.height * 0.3 + 13 * u, 22 * u, 'center');
+    const by = cvs.height * 0.3 - 6 * u, bh = 46 * u, slide = (1 - Math.min(1, (170 - introT) / 24)) * 40 * u;
+    const band = dctx.createLinearGradient(0, 0, cvs.width, 0);
+    band.addColorStop(0, 'rgba(42,26,18,0)'); band.addColorStop(0.2, 'rgba(42,26,18,.55)'); band.addColorStop(0.8, 'rgba(42,26,18,.55)'); band.addColorStop(1, 'rgba(42,26,18,0)');
+    dctx.fillStyle = band; dctx.fillRect(0, by, cvs.width, bh);
+    dctx.fillStyle = 'rgba(255,211,77,.7)'; dctx.fillRect(cvs.width * 0.2, by, cvs.width * 0.6, Math.max(1, u)); dctx.fillRect(cvs.width * 0.2, by + bh - Math.max(1, u), cvs.width * 0.6, Math.max(1, u));
+    hudText(L.def.sub.toUpperCase().split('').join(String.fromCharCode(8202)), cvs.width / 2 - slide, cvs.height * 0.3, 9 * u, 'center', '#ffd34d');
+    hudText(L.def.name, cvs.width / 2 + slide, cvs.height * 0.3 + 12 * u, 22 * u, 'center', '#fff3dc', '#3f8f34');
     dctx.globalAlpha = 1;
   }
 }
@@ -2728,7 +2800,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', layout);
    Menus et écrans
    ========================================================= */
 const overlay = document.getElementById('overlay');
-const panels = { title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores', profiles: 'pProfiles', daily: 'pDaily', ach: 'pAch' };
+const panels = { help: 'pHelp', title: 'pTitle', levels: 'pLevels', settings: 'pSettings', pause: 'pPause', results: 'pResults', bye: 'pBye', scores: 'pScores', profiles: 'pProfiles', daily: 'pDaily', ach: 'pAch' };
 let panelStack = [];
 function showPanel(name, push = true) {
   releaseAllTouch();
@@ -3097,6 +3169,7 @@ overlay.addEventListener('click', e => {
   else if (a === 'scores') { renderScores(); showPanel('scores'); }
   else if (a === 'ach') { renderAch(); showPanel('ach'); }
   else if (a === 'ending') startEnding();
+  else if (a === 'help') openHelp();
   else if (a === 'profiles') { renderProfiles(); showPanel('profiles'); }
   else if (a === 'daily') { renderDaily(); showPanel('daily'); }
   else if (a === 'dailyGo') startLevel(dailyWorld(todayStr()), true);
@@ -3111,7 +3184,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -3397,8 +3470,164 @@ function renderAch() { document.getElementById('achBox').innerHTML = achListHtml
 function updateEndBtn() { const b = document.getElementById('endBtn'); if (b) b.hidden = !prof().endSeen; }
 function updateAchBtn() { updateEndBtn(); const a = achOf(); document.getElementById('achBtn').textContent = `Succès (${ACH.filter(x => a[x.id]).length}/${ACH.length})`; }
 
+/* =========================================================
+   Aide : fiches illustrées par de petites scènes animées avec les vrais sprites, commandes de l'appareil
+   ========================================================= */
+const CTRL_LAB = { move: 'Bouger', jump: 'Sauter', dash: 'Élan', down: 'Bas', pause: 'Pause' };
+const CTRL = {
+  touch: { move: '<span class="chip">Pouce gauche</span> pose-le n\'importe où, puis glisse',
+    jump: '<span class="chip">Moitié droite</span> touche n\'importe où', dash: '<span class="chip">Bouton Élan</span>',
+    down: '<span class="chip">Pouce vers le bas</span>', pause: '<span class="chip">❚❚</span> en haut de l\'écran' },
+  keys: { move: '<kbd>←</kbd><kbd>→</kbd> ou <kbd>Q</kbd><kbd>D</kbd>', jump: '<kbd>Espace</kbd> ou <kbd>↑</kbd> <kbd>Z</kbd>',
+    dash: '<kbd>X</kbd> ou <kbd>Maj</kbd>', down: '<kbd>↓</kbd> ou <kbd>S</kbd>', pause: '<kbd>Échap</kbd> ou <kbd>P</kbd>' },
+  pad: { move: '<kbd>Stick</kbd> ou <kbd>Croix</kbd>', jump: '<kbd>A</kbd> ou <kbd>Y</kbd>', dash: '<kbd>X</kbd> <kbd>B</kbd> <kbd>RB</kbd> <kbd>RT</kbd>',
+    down: '<kbd>Stick</kbd> vers le bas', pause: '<kbd>Start</kbd>' }
+};
+const HELP = [
+  { t: 'Bouger', d: 'Avance et recule. Plus tu pousses, plus Pépin court.', c: ['move', 'pause'], scene: 'move' },
+  { t: 'Sauter', d: 'Un appui bref pour un petit saut, maintiens pour sauter plus haut.', c: ['jump'], scene: 'jump' },
+  { t: 'L\'Élan', d: 'Pépin fonce droit devant : il brise les caisses et renverse n\'importe quel ennemi, même piquant.', c: ['dash'], scene: 'dash' },
+  { t: 'Les ennemis', d: 'Saute sur leur tête pour les écraser, et maintiens Saut pour rebondir plus haut. La bogue piquante, elle, ne se passe qu\'à l\'Élan !', c: ['jump', 'dash'], scene: 'enemy' },
+  { t: 'Descendre', d: 'Sur une branche fine : bas, puis Saut, pour passer au travers.', c: ['down', 'jump'], scene: 'drop' },
+  { t: 'À ramasser', d: 'Des graines pour les points, trois gouttes de rosée cachées par monde, des cœurs pour te soigner, et la feuille : garde Saut enfoncé en tombant pour planer.', c: [], scene: 'items' },
+  { t: 'Les lanternes', d: 'Les petites lanternes gardent ta progression si tu tombes. La grande, au bout, termine le monde : plus tu es rapide, plus la médaille est belle.', c: [], scene: 'lantern' },
+  { t: 'Les secrets', d: 'Un sol fissuré sonne creux : bas puis Saut. Chaque monde cache une graine d\'or… et les douze ouvrent un monde secret.', c: ['down', 'jump'], scene: 'secret' }
+];
+let helpIdx = 0, helpMode = null, helpT = 0;
+const hasPad = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(Boolean); } catch (e) { return false; } };
+const autoMode = () => hasPad() ? 'pad' : (usedTouch || (window.matchMedia && matchMedia('(pointer: coarse)').matches)) ? 'touch' : 'keys';
+function openHelp(i = 0) { helpIdx = i; helpT = 0; if (!helpMode) helpMode = autoMode(); if (!save.helpSeen) { save.helpSeen = true; persist(); } fillHelp(); showPanel('help'); }
+function fillHelp() {
+  const h = HELP[helpIdx], mode = helpMode || autoMode();
+  document.getElementById('helpTitle').textContent = h.t;
+  document.getElementById('helpText').textContent = h.d;
+  document.getElementById('helpKeys').innerHTML = h.c.map(k => `<div class="key"><span class="lab">${CTRL_LAB[k]}</span>${CTRL[mode][k]}</div>`).join('');
+  document.getElementById('helpSeg').innerHTML = [['touch', 'Écran tactile'], ['keys', 'Clavier'], ['pad', 'Manette']]
+    .map(([m, n]) => `<button data-m="${m}" class="${m === mode ? 'on' : ''}" aria-pressed="${m === mode}">${n}</button>`).join('');
+  document.getElementById('helpDots').innerHTML = HELP.map((x, k) => `<button class="${k === helpIdx ? 'on' : ''}" data-k="${k}" aria-label="Fiche ${k + 1} : ${x.t}"></button>`).join('');
+  document.getElementById('helpPrev').disabled = helpIdx === 0;
+  document.getElementById('helpNext').textContent = helpIdx === HELP.length - 1 ? 'C\'est parti !' : 'Suivant ▶';
+  helpT = 0;
+}
+function helpGo(d) { const n = helpIdx + d; if (n >= HELP.length) { SFX.click(); back(); return; } if (n < 0) return; helpIdx = n; SFX.click(); fillHelp(); }
+document.getElementById('helpPrev').addEventListener('click', () => helpGo(-1));
+document.getElementById('helpNext').addEventListener('click', () => helpGo(1));
+document.getElementById('helpDots').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { helpIdx = +b.dataset.k; SFX.click(); fillHelp(); } });
+document.getElementById('helpSeg').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { helpMode = b.dataset.m; SFX.click(); fillHelp(); } });
+document.getElementById('helpTips').addEventListener('click', () => { save.tips = {}; persist(); document.getElementById('helpTipsMsg').textContent = ' : c\'est noté, elles reviendront.'; });
+{ // glisser le doigt sur la fiche pour changer de fiche
+  let sx = null; const card = document.getElementById('helpCard');
+  card.addEventListener('pointerdown', e => { sx = e.clientX; });
+  card.addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 45) helpGo(e.clientX < sx ? 1 : -1); sx = null; });
+}
+addEventListener('keydown', e => { if (!document.getElementById('pHelp').classList.contains('show')) return; if (e.key === 'ArrowRight') helpGo(1); else if (e.key === 'ArrowLeft') helpGo(-1); });
+
+/* Scènes des fiches : 160 × 90, dessinées à chaque image tant que l'aide est ouverte */
+function drawHelpScene() {
+  const cv = document.getElementById('helpCv'); if (!cv || !cv.getContext || !TILES) return;
+  const g = cv.getContext('2d'), sc = HELP[helpIdx].scene, t = helpT++;
+  g.setTransform(cv.width / 160, 0, 0, cv.height / 90, 0, 0); g.imageSmoothingEnabled = false;
+  const sk = g.createLinearGradient(0, 0, 0, 90); sk.addColorStop(0, TH.sky[0]); sk.addColorStop(1, TH.sky[1]); g.fillStyle = sk; g.fillRect(0, 0, 160, 90);
+  const ground = (top, x0 = 0, x1 = 160, skip) => { for (let x = x0; x < x1; x += 16) { if (skip && skip(x)) continue; g.drawImage(TILES.grass[(x >> 4) % 4], x, top); for (let y = top + 16; y < 90; y += 16) g.drawImage(TILES.dirt[(x >> 4) % 4], x, y); } };
+  const pep = (x, foot, face = 1, o = {}) => { const img = renderPep({ t, ph: o.ph != null ? o.ph : t * 0.25, moving: !!o.moving, air: !!o.air, vy: o.vy || 0, blink: false, mood: o.mood || 'normal', leafA: 0, leafS: 0.45, leafBig: false });
+    g.save(); g.translate(Math.round(x), Math.round(foot)); g.scale(face, 1); g.drawImage(img, -8, -19.5, 16, 20); g.restore(); };
+  const spr = (img, cx, bot, flip) => { if (!img) return; g.save(); g.translate(Math.round(cx), Math.round(bot)); if (flip) g.scale(1, -1); g.drawImage(img, -img.width / 4, flip ? 0 : -img.height / 2, img.width / 2, img.height / 2); g.restore(); };
+  const label = (txt, x, y) => { g.font = '600 7px "Pixelify Sans",sans-serif'; g.textAlign = 'center'; g.lineWidth = 2.5; g.strokeStyle = '#2a1a12'; g.strokeText(txt, x, y); g.fillStyle = '#fff3dc'; g.fillText(txt, x, y); };
+  const arc = (k, h) => 4 * h * k * (1 - k);
+  const halo = (x, y, r, col) => { const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, 2 * r, 2 * r); };
+  if (sc === 'move') {
+    ground(72); const k = (t % 240) / 240, x = 80 + 52 * Math.sin(k * Math.PI * 2), face = Math.cos(k * Math.PI * 2) >= 0 ? 1 : -1;
+    pep(x, 72, face, { moving: true }); label(face > 0 ? '▶' : '◀', x, 46);
+  } else if (sc === 'jump') {
+    ground(72); const k = t % 240, big = k >= 120, j = (k % 120) / (big ? 70 : 44);
+    const y = j < 1 ? arc(j, big ? 42 : 16) : 0; pep(80, 72 - y, 1, { air: j < 1, vy: j < 0.5 ? -2 : 2 });
+    label(big ? 'Saut maintenu' : 'Appui bref', 80, 18);
+  } else if (sc === 'dash') {
+    ground(72); const k = t % 200, x = k < 50 ? 20 + k * 0.6 : k < 72 ? 50 + (k - 50) * 4 : 138, broken = x + 5 >= 96;
+    if (!broken) g.drawImage(TILES.crate, 96, 56); else if (k < 110) for (let i = 0; i < 8; i++) { const a = i * 0.8, d = (k - 62) * 1.3; g.fillStyle = i % 2 ? '#c38a4a' : '#7d5128'; g.fillRect(104 + Math.cos(a) * d, 62 - Math.sin(a) * d + (k - 62) * (k - 62) * 0.02, 3, 3); }
+    if (k >= 50 && k < 72) for (let i = 1; i <= 3; i++) { g.globalAlpha = 0.25 * (4 - i) / 3; pep(x - i * 8, 72, 1, { moving: true }); g.globalAlpha = 1; }
+    pep(Math.min(x, 138), 72, 1, { moving: k < 72 }); if (k > 50 && k < 90) label('Élan !', 80, 22);
+  } else if (sc === 'enemy') {
+    ground(72); const k = t % 220, bx = 132 - Math.min(k, 100) * 0.32, jk = (k - 40) / 60;
+    const px = 30 + Math.min(k, 100) * 0.68, py = k < 40 ? 72 : k < 100 ? 72 - arc(Math.min(1, jk), 34) + (jk > 0.5 ? 0 : 0) : 72 - arc(Math.min(1, (k - 100) / 50), 26);
+    if (k < 100) spr(SPR.beetle0 && sprite('beetle' + ((t >> 3) & 3), -1), bx, 72); else if (k < 170) spr(SPR.beetle0, bx, 72 + (k - 100) * 0.5 + 8, true);
+    pep(px, Math.min(72, py), 1, { air: k >= 40 && k < 150, moving: k < 40 }); if (k >= 96 && k < 130) label('Écrasé !', bx, 40);
+  } else if (sc === 'drop') {
+    ground(72); for (let x = 48; x < 112; x += 16) g.drawImage(TILES.branch, x, 40);
+    const k = t % 200, fall = k < 70 ? 0 : Math.min(32, (k - 70) * (k - 70) * 0.04), y = 40 + fall;
+    pep(80, y, 1, { air: k >= 70 && fall < 32 }); if (k < 70 && (k >> 3) % 2) label('▼ puis Saut', 80, 18);
+  } else if (sc === 'items') {
+    ground(72); const bob = i => Math.sin(t * 0.08 + i) * 2;
+    [[SPR.seed, 26, 'graine'], [SPR.gem, 62, 'rosée'], [SPR.heart, 98, 'cœur'], [SPR.leaf, 134, 'feuille']].forEach(([img, x, n], i) => {
+      if (i === 1) halo(x, 44 + bob(i), 12, 'rgba(160,230,255,.8)'); spr(img, x, 50 + bob(i)); label(n, x, 64); });
+  } else if (sc === 'lantern') {
+    ground(72); const k = t % 300, x = 8 + k * 0.5;
+    const lamp = (lx, h, sz, lit) => { if (lit) halo(lx + 1, 72 - h + sz / 2, sz * 3, 'rgba(255,214,120,.9)'); g.fillStyle = '#5a3a22'; g.fillRect(lx, 72 - h, 2, h); g.fillStyle = lit ? '#ffe27a' : '#6a5a50'; g.fillRect(lx - sz / 2 + 1, 72 - h - sz + 2, sz, sz); g.strokeStyle = '#2a1a12'; g.lineWidth = 1; g.strokeRect(lx - sz / 2 + 1, 72 - h - sz + 2, sz, sz); };
+    lamp(56, 22, 6, x > 56); lamp(134, 34, 9, x > 128); pep(Math.min(x, 128), 72, 1, { moving: x < 128, mood: x >= 128 ? 'happy' : 'normal' });
+    if (x > 56 && x < 90) label('Point de contrôle', 56, 36); if (x >= 128) label('Arrivée !', 120, 24);
+  } else if (sc === 'secret') {
+    const k = t % 240, open = k >= 80, top = 56;
+    ground(top); g.fillStyle = 'rgba(0,0,0,.28)'; for (const cx of [72, 88]) { g.fillRect(cx + 4, top + 6, 1, 4); g.fillRect(cx + 5, top + 9, 3, 1); g.fillRect(cx + 11, top + 7, 1, 3); }
+    if (open) { g.fillStyle = TH.dirtD; g.fillRect(56, top + 16, 64, 16); g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(56, top + 16, 64, 16); halo(108, 82, 12, 'rgba(255,210,80,.9)'); if (SPR.gold || SPR.seed) spr(SPR.gold || SPR.seed, 108, 86); }
+    const y = k < 60 ? top : Math.min(88, top + (k - 60) * (k - 60) * 0.05);
+    pep(84, y, 1, { air: k >= 60 && y < 88, mood: open ? 'happy' : 'normal' }); if (k < 60 && (k >> 3) % 2) label('▼ puis Saut', 84, 24); if (open) label('Graine d\'or !', 100, 66);
+  }
+}
+
+/* Astuces en jeu : une courte bulle, une seule fois par appareil, la première fois qu'une nouveauté se présente */
+const TIPS = [
+  { id: 'ressort', s: true, txt: 'Ressort : saute dessus pour t\'envoler très haut.' },
+  { id: 'effrite', c: 'c', txt: 'Ces planches s\'effritent : ne t\'y attarde pas !' },
+  { id: 'glace', c: '_', txt: 'Glace : Pépin glisse, anticipe tes arrêts.' },
+  { id: 'branche', c: '-', txt: 'Branche fine : bas puis Saut pour passer au travers.' },
+  { id: 'caisse', c: 'C', txt: 'Caisse : fonce dedans avec l\'Élan, ou tape-la par-dessous.' },
+  { id: 'eau', c: '~', txt: 'Eau : Pépin ne sait pas nager, saute par-dessus !' },
+  { id: 'bogue', e: 'x', txt: 'Bogue piquante : ne saute pas dessus, passe-la à l\'Élan !' },
+  { id: 'ennemi', e: 'b', txt: 'Saute sur la tête des ennemis pour les écraser.' },
+  { id: 'stalactite', e: 'i', txt: 'Stalactite : elle tombe quand tu passes dessous !' },
+  { id: 'mobile', m: true, txt: 'Plateforme mobile : attends qu\'elle arrive avant de sauter.' },
+  { id: 'lanterne', k: true, txt: 'Lanterne : passe devant pour l\'allumer, tu repartiras d\'ici en cas de chute.' },
+  { id: 'rosee', g: 'gem', txt: 'Goutte de rosée ! Trois sont cachées dans chaque monde.' },
+  { id: 'feuille', g: 'leaf', txt: 'Une feuille ! Attrape-la, puis garde Saut enfoncé en tombant pour planer.' },
+  { id: 'vent', w: true, txt: 'Rafales de vent : elles poussent Pépin, profites-en ou attends qu\'elles passent.' }
+];
+let tipShow = null;
+function checkTips() {
+  if (tipShow && ++tipShow.t > 300) tipShow = null; // durée comptée en pas de jeu : identique sur tous les écrans, figée en pause
+  if (replay || state !== 'play' || introT > 0 || save.settings.tips === false || tipShow || globalT % 15) return;
+  const seen = save.tips || (save.tips = {}), x0 = P.x - 16, x1 = P.x + 130;
+  const tx0 = Math.floor(x0 / T), tx1 = Math.floor(x1 / T), near = (x, y) => x > x0 && x < x1 && Math.abs(y - P.y) < 110;
+  for (const tp of TIPS) {
+    if (seen[tp.id]) continue;
+    let hit = false;
+    if (tp.c) for (let x = tx0; x <= tx1 && !hit; x++) for (let y = 0; y < ROWS; y++) if (tileAt(x, y) === tp.c) { hit = true; break; }
+    if (tp.e) hit = enemies.some(e => !e.dead && e.type === tp.e && near(e.x, e.y));
+    if (tp.m) hit = movers.some(m => near(m.x, m.y));
+    if (tp.s) hit = springs.some(sp => near(sp.x, sp.y)); // les ressorts quittent la grille au chargement
+    if (tp.k) hit = checkpoints.some(c => !c.lit && near(c.x, c.y));
+    if (tp.g) hit = items.some(it => !it.got && it.k === tp.g && near(it.x, it.y));
+    if (tp.w) hit = !!L.def.wind;
+    if (hit) { seen[tp.id] = 1; persist(); tipShow = { txt: tp.txt, t: 0 }; return; }
+  }
+}
+function drawTip(u) {
+  if (!tipShow) return;
+  const t = tipShow.t, life = 300;
+  const a = Math.min(1, t / 14, (life - t) / 24), k = easeOutBack(Math.min(1, t / 14)), fs = 7.5 * u;
+  dctx.save(); dctx.globalAlpha = a; dctx.font = `600 ${Math.round(fs)}px "Pixelify Sans","Trebuchet MS",sans-serif`;
+  const lines = wrap(tipShow.txt, Math.min(cvs.width * 0.7, 230 * u)), w = Math.max(...lines.map(l => dctx.measureText(l).width)) + 34 * u, h = lines.length * fs * 1.3 + 10 * u;
+  const x = (cvs.width - w) / 2, y = 30 * u - (1 - k) * 10 * u;
+  dctx.fillStyle = 'rgba(20,10,8,.3)'; roundRect(dctx, x + 2 * u, y + 3 * u, w, h, h / 2.4); dctx.fill();
+  dctx.lineWidth = 2.5 * u; dctx.strokeStyle = '#2a1a12'; roundRect(dctx, x, y, w, h, h / 2.4); dctx.stroke(); dctx.fillStyle = '#fff3dc'; dctx.fill();
+  dctx.beginPath(); dctx.arc(x + 12 * u, y + h / 2, 7 * u, 0, Math.PI * 2); dctx.fillStyle = '#e8952f'; dctx.fill(); dctx.stroke();
+  dctx.fillStyle = '#fff'; dctx.textAlign = 'center'; dctx.textBaseline = 'middle'; dctx.font = `700 ${Math.round(9 * u)}px "Pixelify Sans",sans-serif`; dctx.fillText('!', x + 12 * u, y + h / 2 + 0.5 * u);
+  dctx.font = `600 ${Math.round(fs)}px "Pixelify Sans","Trebuchet MS",sans-serif`; dctx.textAlign = 'left'; dctx.textBaseline = 'top';
+  lines.forEach((l, i) => { let lx = x + 24 * u; const ly = y + 5 * u + i * fs * 1.3; for (const wd of l.split(' ')) { dctx.fillStyle = KEYWORDS.test(wd) ? '#c25a12' : '#2a1a12'; dctx.fillText(wd, lx, ly); lx += dctx.measureText(wd + ' ').width; } });
+  dctx.restore();
+}
+
 /* Réglages */
-const S = { ghost: 'sGhost', online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
+const S = { tips: 'sTips', ghost: 'sGhost', online: 'sOnline', speed: 'sSpeed', invincible: 'sInvincible', easyJump: 'sEasyJump', quality: 'sQuality', classic: 'sClassic', size: 'sSize', opacity: 'sOpacity', stick: 'sStick', lefty: 'sLefty', haptics: 'sHaptics', music: 'sMusic', sfx: 'sSfx' };
 function fillSettings() {
   document.getElementById('appVersion').textContent = 'Version ' + APP_VERSION + (standalone ? ' · application installée' : '');
   for (const k in S) { const el = document.getElementById(S[k]); if (el.type === 'checkbox') el.checked = !!save.settings[k]; else el.value = save.settings[k]; }
@@ -3567,12 +3796,14 @@ function frame(now) {
   while (acc >= step && n < 5) { update(); acc -= step; n++; }
   if (n === 5) acc = 0;
   withInterp(Math.min(1, acc / step), state === 'ending' ? renderEnding : render);
+  if (document.getElementById('pHelp').classList.contains('show')) drawHelpScene();
   requestAnimationFrame(frame);
 }
 applyQuality();
 updateHints();
 layout();
 goMenu();
+if (!save.helpSeen) setTimeout(() => { if (state === 'menu' && panelStack[panelStack.length - 1] === 'title') openHelp(); }, 700);
 requestAnimationFrame(frame);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
 </script>
