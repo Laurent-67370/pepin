@@ -44,10 +44,10 @@ test('santé', async () => {
 });
 
 test('lecture : monde invalide refusé, monde vide accepté', async () => {
-  assert.equal((await get('/api/scores?level=12')).status, 400);
+  assert.equal((await get('/api/scores?level=13')).status, 400);
   assert.equal((await get('/api/scores?level=abc')).status, 400);
   assert.equal((await get('/api/scores?daily=2026-13')).status, 400);
-  const r = await get('/api/scores?level=11'); assert.equal(r.status, 200); assert.deepEqual(r.body.top, []);
+  const r = await get('/api/scores?level=12'); assert.equal(r.status, 200); assert.deepEqual(r.body.top, []); // le Jardin d'or
 });
 
 test('envoi valide puis lecture du classement', async () => {
@@ -71,7 +71,7 @@ test('origine non autorisée ou absente : 403', async () => {
 
 test('données invalides refusées', async () => {
   const cas = [
-    [{ level: 12 }, 'monde invalide'], [{ level: 1.5 }, 'monde invalide'],
+    [{ level: 13 }, 'monde invalide'], [{ level: 1.5 }, 'monde invalide'],
     [{ score: -1 }, 'score invalide'], [{ score: 60001 }, 'score invalide'], [{ score: 10.5 }, 'score invalide'],
     [{ time: 5 }, 'temps invalide'], [{ level: 11, time: 17.9 }, 'temps invalide'], [{ time: 3601 }, 'temps invalide'],
     [{ name: 'A' }, 'prénom invalide'], [{ name: 'Joueur<script>' }, 'prénom invalide'], [{ name: 'Unprénomtroplong' }, 'prénom invalide'],
@@ -178,4 +178,10 @@ test('une partie trop volumineuse est refusée sans faire tomber le serveur', as
   const r = await post({ level: 0, score: 1, time: 20, name: 'Gros', device: 'f0f0f0f0f0f0f0f0a005', replay: 'x'.repeat(300 * 1024) }).catch(() => ({ status: 0 }));
   assert.notEqual(r.status, 200);
   assert.equal((await get('/api/health')).status, 200);
+});
+
+test('Jardin d\'or (monde 13) : records acceptés, temps minimal contrôlé, jamais tiré au défi du jour', async () => {
+  assert.equal((await post(score({ level: 12, time: 40, device: 'abababababababab1313' }))).status, 200);
+  assert.equal((await post(score({ level: 12, time: 10.5, device: 'abababababababab1314' }))).body.error, 'temps invalide');
+  for (let k = 0; k < 400; k++) { const d = new Date(Date.UTC(2026, 0, 1 + k)).toISOString().slice(0, 10); assert.ok((await get('/api/scores?daily=' + d)).body.level < 12, d); if (k > 40) break; }
 });

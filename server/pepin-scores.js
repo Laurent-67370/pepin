@@ -11,11 +11,12 @@ const PORT = +process.env.PORT || 3215;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const FILE = path.join(DATA_DIR, 'scores.json');
 const ORIGINS = (process.env.ALLOW_ORIGINS || 'https://laurent-67370.github.io,https://pepin.lhusser.fr').split(',').map(s => s.trim());
-const LEVELS = 12;
+const LEVELS = 13; // 12 mondes de l'aventure + le Jardin d'or, ouvert par les 12 graines d'or
+const DAILY_WORLDS = 12; // le défi du jour ne tire que dans l'aventure
 // Temps minimal plausible par monde (secondes), d'après le parcours optimal du robot vérificateur
-const MIN_TIME = [10, 10, 12, 11, 10, 15, 11, 10, 11, 11, 11, 18];
+const MIN_TIME = [10, 10, 12, 11, 10, 15, 11, 10, 11, 11, 11, 18, 11];
 const MAX_SCORE = 60000;
-function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % LEVELS; }
+function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % DAILY_WORLDS; }
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NAME_RE = /^[\p{L}\p{N} _.'-]{2,12}$/u;
 const MAX_BODY = 256 * 1024; // une partie de 15 minutes tient largement dedans

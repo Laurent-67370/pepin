@@ -2,7 +2,8 @@
    Usage : node tools/verifier-coherence.js   (depuis la racine du dépôt)
    1. APP_VERSION (index.html) et VERSION (sw.js) doivent correspondre, sinon les PWA installées ne se mettent pas à jour.
    2. Le monde du défi du jour doit être tiré de la même façon côté jeu et côté serveur.
-   3. Le serveur doit connaître autant de mondes que le jeu, avec un temps minimal pour chacun. */
+   3. Le serveur doit connaître autant de mondes que le jeu, avec un temps minimal pour chacun,
+      et tirer le défi du jour parmi les mêmes mondes (les 12 de l'aventure, sans le monde bonus). */
 'use strict';
 const fs = require('fs'), path = require('path');
 const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
@@ -21,6 +22,9 @@ const vm = require('vm'), a = html.indexOf('function Builder(w)'), b = html.inde
 const ctx = { T: 16, ROWS: 15 }; vm.createContext(ctx); vm.runInContext(html.slice(a, e).replace('const LEVELS', 'var LEVELS'), ctx);
 const mondesJeu = ctx.LEVELS.length; // même extraction que verifier-niveaux.js
 const mondesServeur = +extraire(serveur, /const LEVELS = (\d+);/, 'LEVELS dans pepin-scores.js');
+const aventureJeu = +extraire(html, /const MAIN_WORLDS = (\d+);/, 'MAIN_WORLDS dans index.html');
+const aventureServeur = +extraire(serveur, /const DAILY_WORLDS = (\d+);/, 'DAILY_WORLDS dans pepin-scores.js');
+if (aventureJeu !== aventureServeur) erreurs.push(`défi du jour : ${aventureJeu} mondes côté jeu, ${aventureServeur} côté serveur`);
 const tempsMin = (extraire(serveur, /const MIN_TIME = \[([^\]]+)\]/, 'MIN_TIME dans pepin-scores.js') || '').split(',').filter(s => s.trim()).length;
 if (mondesJeu !== mondesServeur) erreurs.push(`le jeu a ${mondesJeu} mondes, le serveur en attend ${mondesServeur}`);
 if (tempsMin !== mondesServeur) erreurs.push(`MIN_TIME a ${tempsMin} valeurs pour ${mondesServeur} mondes`);
@@ -28,16 +32,16 @@ if (tempsMin !== mondesServeur) erreurs.push(`MIN_TIME a ${tempsMin} valeurs pou
 // 3. Monde du jour : on exécute les deux fonctions sur trois ans de dates
 const fonction = (texte, quoi) => {
   const corps = extraire(texte, /function dailyWorld\(day\) \{([^\n]+)\}/, `dailyWorld dans ${quoi}`);
-  return corps && new Function('day', 'LEVELS', corps.replace(/LEVELS\.length/g, 'LEVELS'));
+  return corps && new Function('day', 'N', corps.replace(/MAIN_WORLDS|DAILY_WORLDS|LEVELS\.length|LEVELS/g, 'N'));
 };
 const fJeu = fonction(html, 'index.html'), fServeur = fonction(serveur, 'pepin-scores.js');
 if (fJeu && fServeur) {
   const d = new Date('2026-01-01T12:00:00Z');
   for (let k = 0; k < 1100; k++, d.setUTCDate(d.getUTCDate() + 1)) {
-    const jour = d.toISOString().slice(0, 10), a = fJeu(jour, mondesJeu), b = fServeur(jour, mondesServeur);
+    const jour = d.toISOString().slice(0, 10), a = fJeu(jour, aventureJeu), b = fServeur(jour, aventureServeur);
     if (a !== b) { erreurs.push(`monde du jour différent le ${jour} : jeu ${a}, serveur ${b}`); break; }
   }
 }
 
 if (erreurs.length) { console.error('Cohérence : ÉCHEC\n - ' + erreurs.join('\n - ')); process.exitCode = 1; }
-else console.log(`Cohérence : OK (version ${appVersion}, ${mondesJeu} mondes, monde du jour identique sur 3 ans)`);
+else console.log(`Cohérence : OK (version ${appVersion}, ${mondesJeu} mondes dont ${aventureJeu} pour le défi du jour, monde du jour identique sur 3 ans)`);

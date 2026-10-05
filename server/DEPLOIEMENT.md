@@ -76,3 +76,9 @@ l'envoi avec partie échoue et le jeu renvoie aussitôt le score seul : aucun sc
 Avant de pousser une modification du serveur : `node --test tests/serveur.test.js`.
 
 Les scores sont stockés dans `/opt/pepin-scores/data/scores.json`. Pour remettre le classement à zéro : arrêter le service, supprimer ce fichier, relancer.
+
+### Passage à la 1.6.1 (monde 13, le Jardin d'or)
+Le serveur doit accepter un 13e monde (`LEVELS = 13`, temps minimal 11 s) ; le défi du jour, lui, reste tiré parmi les 12 mondes
+de l'aventure (`DAILY_WORLDS = 12`), comme dans le jeu. Mettre à jour `pepin-scores.js` (« Mettre à jour le serveur ») juste après le push.
+Avant cette mise à jour, seuls les records du monde 13 seraient refusés (« monde invalide ») ; ce monde n'est ouvert qu'aux joueurs
+qui ont les 12 graines d'or, la fenêtre de quelques minutes ne gêne personne.

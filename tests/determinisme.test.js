@@ -9,7 +9,7 @@ const { creerMoteur, joueurRobot, mulberry } = require('../tools/moteur-headless
 
 const PAS = 4000;   // un peu plus d'une minute de jeu par monde
 const TOUS = 120;   // comparaison de l'état tous les 2 s de jeu
-const MONDES = 12;
+const MONDES = 13; // les 12 mondes de l'aventure et le Jardin d'or
 
 /* Joue un monde et renvoie la liste des empreintes successives */
 function jouer(moteur, monde, graine, robot) {

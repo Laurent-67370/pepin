@@ -34,11 +34,13 @@ jobs:
         run: node --test tests/secrets.test.js
       - name: Scène de fin
         run: node --test tests/fin.test.js
+      - name: Monde 13 (Jardin d'or)
+        run: node --test tests/monde13.test.js
       - name: Succès
         run: node --test tests/succes.test.js
 
   niveaux:
-    name: Robot vérificateur des 12 mondes
+    name: Robot vérificateur des 13 mondes
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

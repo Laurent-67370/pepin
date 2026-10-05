@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#1d1420">
 <title>Pépin, la graine voyageuse</title>
-<meta name="description" content="Jeu de plateforme original : 12 mondes, 2 boss, jouable au doigt, au clavier ou à la manette.">
+<meta name="description" content="Jeu de plateforme original : 12 mondes et un monde secret, 2 boss, jouable au doigt, au clavier ou à la manette.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -485,7 +485,10 @@ const SONGS = [
     bass: [38,38,50,38, 38,50,38,0, 34,34,46,34, 34,46,34,0, 36,36,48,36, 36,48,36,0, 37,37,49,37, 40,0,37,0] },
   { tempo: 84, leadType: 'triangle', hat: false, // fin du voyage
     lead: [72,0,76,0, 79,0,0,0, 74,0,79,0, 74,0,0,0, 76,0,79,0, 84,0,0,0, 81,0,77,0, 72,0,0,0],
-    bass: [48,0,0,0, 55,0,0,0, 43,0,0,0, 50,0,0,0, 45,0,0,0, 52,0,0,0, 41,0,0,0, 48,0,0,0] }
+    bass: [48,0,0,0, 55,0,0,0, 43,0,0,0, 50,0,0,0, 45,0,0,0, 52,0,0,0, 41,0,0,0, 48,0,0,0] },
+  { tempo: 124, leadType: 'square', hat: true, // le jardin des graines d'or
+    lead: [74,0,78,81, 0,86,0,81, 83,0,81,78, 76,0,0,0, 74,0,78,81, 0,86,0,88, 86,0,83,81, 78,0,0,0],
+    bass: [50,0,57,0, 50,0,57,0, 45,0,52,0, 45,0,52,0, 47,0,54,0, 47,0,54,0, 43,0,50,0, 45,0,52,0] }
 ];
 const mus = { song: null, idx: -1, step: 0, next: 0, timer: null, pending: null };
 const mf = n => 440 * Math.pow(2, (n - 69) / 12);
@@ -887,6 +890,8 @@ const CROWN = mk(12, 6, c => {
    Thèmes et tuiles
    ========================================================= */
 const THEMES = {
+  golden: { rays:true, id:'golden', sky:['#f2b85e','#fff0c4'], grass:'#e2b93b', grassD:'#a8801c', grassL:'#fff0a0', dirt:'#8a5a34', dirtD:'#6b4226', dirtL:'#a7713f',
+    plank:'#d9a64a', plankD:'#8a5a20', thorn:'#7a2b4a', thornL:'#d8577a', water:'#5fc4d0', mover:'leaf', ambient:'sparkles' },
   orchard: { rays:true, id:'orchard', sky:['#9fd8e6','#ffe1b5'], grass:'#6cc04a', grassD:'#3f8f34', grassL:'#a8e27a', dirt:'#8a5a34', dirtD:'#6b4226', dirtL:'#a7713f',
     plank:'#c38a4a', plankD:'#7d5128', thorn:'#7a2b4a', thornL:'#d8577a', water:'#4fb3c9', mover:'leaf', ambient:'petals' },
   roots: { id:'roots', sky:['#140f22','#2e2046'], grass:'#4fae94', grassD:'#2f7465', grassL:'#8de0c6', dirt:'#4b3f66', dirtD:'#352c4d', dirtL:'#635589',
@@ -1201,6 +1206,28 @@ const LEVELS = [
       b.fill(60, 69, 0, 11, '#');
       b.line(39, 41, 9, '='); b.line(53, 55, 9, '=');
       b.put(47, 4, 'B'); b.put(57, 11, 'G');
+    } },
+  { name: 'Le Jardin d\'or', sub: 'Monde 13', theme: 'golden', w: 200, song: 14,
+    signs: [[4, 'Le jardin des graines d\'or. Personne n\'y est venu depuis longtemps…'], [21, 'Le pont s\'effrite : ne t\'arrête pas !'], [90, 'Encore un effort : l\'arbre d\'or est tout au bout.']],
+    build(b) {
+      // Entrée du jardin, puis un pont qui s'effrite au-dessus du vide
+      b.ground(0, 22, 12); b.put(2, 11, 'P'); b.row(6, 10, 'ooooo'); b.put(16, 11, 'b');
+      b.line(25, 33, 11, 'c'); b.row(25, 9, 'o o o o o');
+      b.ground(36, 50, 12); b.put(42, 11, 'x'); b.fill(47, 47, 10, 11, 'C'); b.row(44, 8, 'ooo');
+      // Ronces sous les planches ; la première rosée, tout là-haut, par le ressort
+      b.ground(51, 70, 12); b.line(54, 66, 11, '^'); b.line(53, 58, 8, '='); b.line(61, 67, 8, '='); b.put(55, 7, 'S'); b.put(56, 2, '*'); b.row(61, 7, 'ooooo'); b.put(64, 4, 'w');
+      // Plateformes mobiles au-dessus de l'étang
+      b.line(71, 88, 14, '~'); b.put(74, 10, 'M'); b.row(73, 8, 'ooo'); b.put(82, 9, 'V'); b.row(82, 5, 'oo');
+      b.ground(89, 104, 12); b.put(91, 11, 'K'); b.put(99, 11, 'b'); b.put(97, 6, 'w');
+      // Escalier de planches vers la deuxième rosée, caisses à briser
+      b.ground(105, 128, 12); b.line(108, 110, 9, '='); b.line(112, 114, 6, '='); b.line(116, 118, 3, '='); b.put(117, 1, '*'); b.row(112, 5, 'ooo');
+      b.fill(122, 123, 10, 11, 'C'); b.put(126, 11, 'x');
+      // Glace et vide
+      b.ground(129, 137, 12); b.line(129, 137, 12, '_'); b.row(138, 8, 'oooo'); b.ground(142, 152, 12); b.line(142, 152, 12, '_'); b.put(148, 11, 'b');
+      // Ressort et ronces : la troisième rosée
+      b.ground(153, 176, 12); b.put(155, 11, 'S'); b.line(158, 164, 4, '='); b.row(158, 3, 'oooooo'); b.put(165, 2, '*'); b.line(160, 163, 11, '^'); b.put(169, 11, 'K'); b.put(172, 7, 'w');
+      // Les hauteurs, et l'arbre d'or
+      b.ground(177, 199, 12); b.line(180, 182, 9, '='); b.line(185, 187, 7, '='); b.row(185, 6, 'ooo'); b.put(190, 11, 'x'); b.put(194, 11, 'G');
     } }
 ];
 
@@ -2120,6 +2147,17 @@ function drawBackground() {
       ctx.fillStyle = '#e0484d'; ctx.fillRect(x - 8, base - 33, 2, 2); ctx.fillRect(x + 5, base - 40, 2, 2); ctx.fillRect(x + 1, base - 27, 2, 2);
     }
     wave('#8cc56c', 200, 5, 0.02, 3, 0.05, 0.55);
+  } else if (TH.id === 'golden') {
+    circ(VW * 0.72, 52, 34, 'rgba(255,236,170,.35)'); circ(VW * 0.72, 52, 22, '#fff2c0');
+    wave('#f0cf86', 150, 12, 0.011, 6, 0.029, 0.18);
+    const par = 0.4, sp = 80, start = Math.floor(cx * par / sp) - 1;
+    for (let i = start; i < start + Math.ceil(VW / sp) + 3; i++) {
+      const x = Math.round(i * sp - cx * par + hash(i) * 30), base = Math.round(196 - (cam.y + 24) * par);
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 2, base - 28, 5, 28);
+      circ(x, base - 36, 16 + hash(i + 3) * 4, '#c9a032'); circ(x - 6, base - 40, 10, '#e8c450'); circ(x + 7, base - 33, 9, '#e8c450');
+      for (let k = 0; k < 3; k++) { const fx = x - 8 + k * 7, fy = base - 30 - ((i + k) % 3) * 6; glow(fx + 1, fy + 1, 5, 'rgba(255,220,90,0.9)', 0.35 + 0.25 * Math.sin(t * 0.05 + i + k)); ctx.fillStyle = '#ffe27a'; ctx.fillRect(fx, fy, 2, 2); }
+    }
+    wave('#d6b45a', 200, 5, 0.02, 3, 0.05, 0.55);
   } else if (TH.id === 'roots') {
     const par = 0.2;
     for (let i = Math.floor(cx * par / 34) - 1; i < Math.floor(cx * par / 34) + VW / 34 + 2; i++) {
@@ -2712,16 +2750,16 @@ function updateHints() {
   if (touchLike) document.body.classList.add('has-touch');
 }
 /* Médailles de temps : seuils calés sur le parcours optimal du robot vérificateur */
-const MEDAL_BASE = [13.1, 12.9, 15.1, 14.5, 13.5, null, 14.4, 13.5, 14.0, 14.0, 14.8, null];
+const MEDAL_BASE = [13.1, 12.9, 15.1, 14.5, 13.5, null, 14.4, 13.5, 14.0, 14.0, 14.8, null, 15.4]; // monde 13 : estimé d'après la largeur, à affiner en jouant
 function medalTimes(i) { const b = MEDAL_BASE[i]; return b ? [Math.round(b * 2.6), Math.round(b * 4), Math.round(b * 6)] : [55, 80, 120]; }
 function medalFor(i, frames) { const s = frames / 60, m = medalTimes(i); return s <= m[0] ? 3 : s <= m[1] ? 2 : s <= m[2] ? 1 : 0; }
 const MEDAL_NAME = ['Aucune', 'Bronze', 'Argent', 'Or'], MEDAL_COL = ['#5a4a44', '#d08a4a', '#cfd8e0', '#ffcf3a'];
 const fmtSec = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const MAP_COL = { orchard: '#6cc04a', roots: '#7d6aa8', canopy: '#e8743b', frost: '#9fd6f2', lake: '#3d8fb0', hive: '#f2b632', dunes: '#ecc77e', crystal: '#9060e0', marsh: '#7a9a4a', volcano: '#ff6a1a', sky: '#bcd8f2', castle: '#5a2f9a' };
+const MAP_COL = { golden: '#ffc628', orchard: '#6cc04a', roots: '#7d6aa8', canopy: '#e8743b', frost: '#9fd6f2', lake: '#3d8fb0', hive: '#f2b632', dunes: '#ecc77e', crystal: '#9060e0', marsh: '#7a9a4a', volcano: '#ff6a1a', sky: '#bcd8f2', castle: '#5a2f9a' };
 let mapSel = 0;
 function renderMap() {
   const box = document.getElementById('levelList'), n = LEVELS.length, W = 340, rowH = 84, H = n * rowH + 60;
-  const cur = Math.min(save.unlocked, n) - 1;
+  const cur = Math.min(save.unlocked, MAIN_WORLDS) - 1;
   const pos = i => ({ x: Math.round(W / 2 + Math.sin(i * 1.15 + 0.3) * 105), y: H - 50 - i * rowH });
   let path = '', done = '';
   for (let i = 0; i < n; i++) { const a = pos(i); if (i === 0) { path = `M${a.x} ${a.y}`; continue; } const b = pos(i - 1), my = (a.y + b.y) / 2; const seg = ` C${b.x} ${my} ${a.x} ${my} ${a.x} ${a.y}`; path += seg; if (i <= cur) done += (done ? '' : `M${pos(0).x} ${pos(0).y}`) + seg; }
@@ -2729,7 +2767,7 @@ function renderMap() {
   g += `<path d="${path}" fill="none" stroke="#7a5a44" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round" opacity=".55"/>`;
   if (done) g += `<path d="${done}" fill="none" stroke="#e8952f" stroke-width="6" stroke-linecap="round"/>`;
   LEVELS.forEach((lv, i) => {
-    const { x, y } = pos(i), locked = i > cur, best = save.best[i], med = best && best.medal ? best.medal : 0, r = lv.boss ? 27 : 22;
+    const { x, y } = pos(i), locked = !isOpen(i), best = save.best[i], med = best && best.medal ? best.medal : 0, r = lv.boss ? 27 : 22;
     const fill = locked ? '#8a7a74' : MAP_COL[lv.theme] || '#6cc04a';
     g += `<g class="node${locked ? ' locked' : ''}" data-i="${i}" tabindex="${locked ? -1 : 0}" role="listitem" aria-label="${lv.sub} : ${lv.name}${locked ? ', verrouillé' : ''}">`;
     if (med) g += `<circle cx="${x}" cy="${y}" r="${r + 6}" fill="none" stroke="${MEDAL_COL[med]}" stroke-width="5"/>`;
@@ -2750,16 +2788,16 @@ function renderMap() {
   box.innerHTML = g;
   box.querySelectorAll('.node').forEach(el => {
     const i = +el.dataset.i;
-    const pick = () => { if (i > cur) { SFX.click(); showMapInfo(i, true); return; } SFX.click(); mapSel = i; showMapInfo(i); };
+    const pick = () => { if (!isOpen(i)) { SFX.click(); showMapInfo(i, true); return; } SFX.click(); mapSel = i; showMapInfo(i); };
     el.addEventListener('click', pick);
-    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i <= cur) { if (mapSel === i) startLevel(i); else pick(); } } });
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (isOpen(i)) { if (mapSel === i) startLevel(i); else pick(); } } });
   });
-  mapSel = Math.min(mapSel, cur); showMapInfo(mapSel);
+  if (!isOpen(mapSel)) mapSel = cur; showMapInfo(mapSel);
   requestAnimationFrame(() => { const w = document.getElementById('mapWrap'); const svg = box.querySelector('svg'); if (svg) { const k = svg.clientWidth / W; w.scrollTop = Math.max(0, pos(mapSel).y * k - w.clientHeight / 2); } });
 }
 function showMapInfo(i, locked) {
   const lv = LEVELS[i], best = save.best[i], el = document.getElementById('mapInfo'), m = medalTimes(i);
-  if (locked) { el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>Termine le monde précédent pour l'ouvrir.</div>`; return; }
+  if (locked) { el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>${i >= MAIN_WORLDS ? `Trouve les 12 graines d'or des cachettes pour l'ouvrir (${goldCount()}/12).` : 'Termine le monde précédent pour l\'ouvrir.'}</div>`; return; }
   const med = best && best.medal ? best.medal : 0;
   const line = best ? `${best.score ? 'Meilleur score ' + fmtNum(best.score) + ' · ' : ''}${best.time < 359999 ? 'Record ' + fmtTime(best.time) : 'Terminé avec assistance'} · ${best.seeds} graines · <span class="medal m${med}"></span>${MEDAL_NAME[med]}` : 'Pas encore terminé';
   el.innerHTML = `<div class="txt"><strong>${lv.sub} : ${lv.name}</strong>${line}<br>Or ${fmtSec(m[0])} · Argent ${fmtSec(m[1])} · Bronze ${fmtSec(m[2])}</div>`;
@@ -2795,7 +2833,12 @@ const todayStr = () => parisDay(new Date());
 /* Ménage : on ne garde que les 30 derniers défis du jour de chaque profil */
 { const lim = parisDay(new Date(Date.now() - 30 * 864e5)); let n = 0; for (const p of save.profiles) for (const d of Object.keys(p.daily)) if (d < lim) { delete p.daily[d]; n++; } if (n) persist(); }
 function dailySeed(day) { let h = 7; for (const c of day) h = (Math.imul(h, 33) + c.charCodeAt(0)) >>> 0; return h; } // même aléatoire pour tous les joueurs du jour
-function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % LEVELS.length; }
+/* Les 12 mondes de l'aventure ; le 13e est un monde bonus, ouvert par les 12 graines d'or des cachettes.
+   Défi du jour, fin du voyage et succès « des 12 mondes » portent sur l'aventure seule. */
+const MAIN_WORLDS = 12;
+const goldCount = () => Object.keys(save.best).filter(k => +k < MAIN_WORLDS && save.best[k] && save.best[k].gold).length;
+const isOpen = i => i < MAIN_WORLDS ? i + 1 <= save.unlocked : goldCount() >= MAIN_WORLDS;
+function dailyWorld(day) { let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % MAIN_WORLDS; }
 let dailyRun = null;
 function updateDailyBtn() { document.getElementById('dailyBtn').textContent = `Défi du jour : ${LEVELS[dailyWorld(todayStr())].name}`; }
 function renderDaily() {
@@ -2881,9 +2924,9 @@ function renderLevelList() {
   const list = document.getElementById('levelList'); list.innerHTML = '';
   LEVELS.forEach((lv, i) => {
     const b = document.createElement('button'); b.className = 'btn lvl';
-    const best = save.best[i]; const locked = i + 1 > save.unlocked;
+    const best = save.best[i]; const locked = !isOpen(i);
     const gems = (best ? best.gems.map(g => g ? '●' : '○').join('') : '○○○') + (lv.secret ? `<span style="color:#c08a00">${best && best.gold ? '◆' : '◇'}</span>` : '');
-    b.innerHTML = `<span>${lv.sub} : ${lv.name}<small>${locked ? 'Termine le monde précédent' : best ? 'Record ' + fmtTime(best.time) + ', ' + best.seeds + ' graines' : 'Pas encore terminé'}</small></span><span class="gems">${locked ? '' : gems}</span>`;
+    b.innerHTML = `<span>${lv.sub} : ${lv.name}<small>${locked ? (i >= MAIN_WORLDS ? `12 graines d'or pour l'ouvrir (${goldCount()}/12)` : 'Termine le monde précédent') : best ? 'Record ' + fmtTime(best.time) + ', ' + best.seeds + ' graines' : 'Pas encore terminé'}</small></span><span class="gems">${locked ? '' : gems}</span>`;
     b.disabled = locked;
     b.onclick = () => { SFX.click(); startLevel(i); };
     list.appendChild(b);
@@ -2944,12 +2987,12 @@ function showResults() {
   if (assisted && prev) save.best[i].time = prev.time; else if (assisted) save.best[i].time = 359999;
   if (medal > save.best[i].medal) save.best[i].medal = medal;
   const mt = medalTimes(i), nextM = medal < 3 && !assisted ? `${MEDAL_NAME[medal + 1]} en moins de ${fmtSec(mt[2 - medal])}` : '';
-  if (save.unlocked < i + 2) save.unlocked = Math.min(LEVELS.length, i + 2);
+  if (i < MAIN_WORLDS && save.unlocked < i + 2) save.unlocked = Math.min(MAIN_WORLDS, i + 2);
   persist();
   if (newHS) setTimeout(() => SFX.gem(), 500);
-  const last = i === LEVELS.length - 1;
-  document.getElementById('rTitle').textContent = last ? 'Toutes les lanternes brillent' : `${L.def.name} : terminé`;
-  document.getElementById('rSub').textContent = last ? 'Le Frelon Royal s\'est envolé pour de bon et Pépin a rallumé les douze lanternes. Reviens chercher les rosées manquantes.' : 'La lanterne est rallumée. En route vers le monde suivant.';
+  const last = i === MAIN_WORLDS - 1, bonus = i >= MAIN_WORLDS;
+  document.getElementById('rTitle').textContent = last ? 'Toutes les lanternes brillent' : bonus ? 'Le jardin est traversé' : `${L.def.name} : terminé`;
+  document.getElementById('rSub').textContent = bonus ? 'Les douze graines d\'or ont ouvert le jardin, et Pépin l\'a traversé de bout en bout. Bravo !' : last ? 'Le Frelon Royal s\'est envolé pour de bon et Pépin a rallumé les douze lanternes. Reviens chercher les rosées manquantes.' : 'La lanterne est rallumée. En route vers le monde suivant.';
   document.getElementById('rStats').innerHTML =
     `<div><span>Graines</span><strong>${stats.seeds}/${stats.seedsTotal}</strong></div>` +
     `<div><span>Gouttes de rosée</span><strong>${gemsN}/3</strong></div>` +
@@ -2967,7 +3010,7 @@ function showResults() {
     (assisted ? `<div><span>Record</span><strong style="font-size:15px">Hors classement (assistance)</strong></div>` : counts ? `<div><span>Meilleur score</span><strong>${fmtNum(Math.max(prevHS, total))}</strong></div>` : '');
   const btns = document.getElementById('rButtons'); btns.innerHTML = '';
   const add = (label, fn, primary) => { const b = document.createElement('button'); b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = () => { SFX.click(); fn(); }; btns.appendChild(b); };
-  if (!last) add('Monde suivant', () => startLevel(i + 1), true);
+  if (i < MAIN_WORLDS - 1) add('Monde suivant', () => startLevel(i + 1), true);
   if (last) add('Voir la fin du voyage', startEnding, true);
   add('Rejouer ce monde', () => startLevel(i), false);
   addReplayBtn(add);
@@ -3041,7 +3084,7 @@ overlay.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   AU.init(); SFX.click();
   const a = b.dataset.act;
-  if (a === 'play') { const next = Math.min(save.unlocked, LEVELS.length) - 1; const firstUnfinished = LEVELS.findIndex((_, i) => !save.best[i]); startLevel(firstUnfinished >= 0 && firstUnfinished <= next ? firstUnfinished : next); }
+  if (a === 'play') { const next = Math.min(save.unlocked, MAIN_WORLDS) - 1; const firstUnfinished = LEVELS.findIndex((_, i) => i < MAIN_WORLDS && !save.best[i]); startLevel(firstUnfinished >= 0 && firstUnfinished <= next ? firstUnfinished : next); }
   else if (a === 'levels') { showPanel('levels'); renderMap(); }
   else if (a === 'settings') { fillSettings(); document.getElementById('saveMsg').textContent = ''; showPanel('settings'); }
   else if (a === 'export') exportSave();
@@ -3068,7 +3111,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 /* =========================================================
    Application installable (PWA) : hors ligne, plein écran natif
    ========================================================= */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const standalone = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null, pendingReload = false;
 if (standalone) document.getElementById('btnFs').hidden = true;
@@ -3132,7 +3175,7 @@ function cleanProfile(p, i) {
   const name = typeof p.name === 'string' && /^[\p{L}\p{N} _.'-]{2,12}$/u.test(p.name.trim()) ? p.name.trim() : 'Joueur ' + (i + 1);
   const ach = {}; // succès : seulement des identifiants connus, avec leur date
   for (const [id, t] of Object.entries(p.ach || {})) if (ACH_BY_ID[id] && Number.isFinite(t)) ach[id] = t;
-  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, LEVELS.length, 1), best, daily, ach, ...(p.endSeen === true ? { endSeen: true } : {}),
+  return { id: p.id, name, color: num(p.color, 0, 5, i % 6), unlocked: num(p.unlocked, 1, MAIN_WORLDS, 1), best, daily, ach, ...(p.endSeen === true ? { endSeen: true } : {}),
     uid: typeof p.uid === 'string' && /^[a-f0-9-]{16,40}$/i.test(p.uid) ? p.uid : newUid() };
 }
 /* Fusionne une sauvegarde importée : profils ajoutés ou remplacés (même identifiant), tableaux d'honneur réunis,
@@ -3291,6 +3334,7 @@ const ACH = [
   { id: 'ombre', n: 'Plus vite que mon ombre', d: 'Battre ton fantôme.', skill: true },
   { id: 'premier-defi', n: 'Premier défi', d: 'Terminer un défi du jour.' },
   { id: 'sept-defis', n: 'Fidèle au rendez-vous', d: 'Terminer 7 défis du jour.' },
+  { id: 'jardin-secret', n: 'Le jardin secret', d: 'Terminer le 13e monde, ouvert par les 12 graines d\'or.' },
   { id: 'cachette', n: 'Ça sonne creux', d: 'Trouver une graine d\'or dans une cachette.' },
   { id: 'toutes-cachettes', n: 'Chercheur d\'or', d: 'Trouver les 12 graines d\'or.' },
   { id: 'pacifiste', n: 'Pacifiste', d: 'Terminer le Verger sans vaincre un seul ennemi.', skill: true, hidden: true },
@@ -3302,14 +3346,16 @@ function endRunAchievements(r, p) {
   const ids = ['premiere-lanterne'], best = p.best || {}, done = Object.keys(best).filter(k => best[k]);
   if (r.level === 5) ids.push('grand-frelon');
   if (r.level === 11) ids.push('frelon-royal');
-  if (done.length >= LEVELS.length) ids.push('douze-lanternes');
+  const main = done.filter(k => +k < MAIN_WORLDS);
+  if (main.length >= MAIN_WORLDS) ids.push('douze-lanternes');
+  if (r.level === MAIN_WORLDS) ids.push('jardin-secret');
   if (r.gems >= 1) ids.push('premiere-rosee');
   if (r.gems >= 3) ids.push('trois-rosees');
-  if (done.reduce((n, k) => n + (best[k].gems || []).filter(Boolean).length, 0) >= LEVELS.length * 3) ids.push('toutes-rosees');
+  if (main.reduce((n, k) => n + (best[k].gems || []).filter(Boolean).length, 0) >= MAIN_WORLDS * 3) ids.push('toutes-rosees');
   if (r.seeds >= r.seedsTotal) ids.push('jardinier');
   if (r.cratesTotal > 0 && r.crates >= r.cratesTotal) ids.push('demenageur');
   if (r.gold) ids.push('cachette');
-  if (done.filter(k => best[k].gold).length >= LEVELS.length) ids.push('toutes-cachettes');
+  if (main.filter(k => best[k].gold).length >= MAIN_WORLDS) ids.push('toutes-cachettes');
   if (r.daily) ids.push('premier-defi');
   if (r.dailyCount >= 7) ids.push('sept-defis');
   if (!r.assisted) {
@@ -3318,7 +3364,7 @@ function endRunAchievements(r, p) {
     if (r.classic && r.deaths === 0) ids.push('a-l-ancienne');
     if (r.medal >= 1) ids.push('medaille');
     if (r.medal >= 3) ids.push('or-pur');
-    if (LEVELS.every((_, i) => best[i] && best[i].medal >= 3)) ids.push('tresor');
+    if (LEVELS.slice(0, MAIN_WORLDS).every((_, i) => best[i] && best[i].medal >= 3)) ids.push('tresor');
     if (r.beatGhost) ids.push('ombre');
     if (r.level === 0 && r.kills === 0) ids.push('pacifiste');
   }
@@ -3392,11 +3438,11 @@ const END_CREDITS = 1120, END_HOLD = 1120 + 760;
 let endingT = 0, endingData = null, endingSkipAt = -999;
 function startEnding() {
   const p = prof(); p.endSeen = true; persist();
-  const best = save.best || {}, ks = Object.keys(best).filter(k => best[k]);
+  const best = save.best || {}, ks = Object.keys(best).filter(k => best[k] && +k < MAIN_WORLDS);
   endingData = {
     score: totalHS(), gems: ks.reduce((n, k) => n + (best[k].gems || []).filter(Boolean).length, 0),
     gold: ks.filter(k => best[k].gold).length, ach: ACH.filter(x => (p.ach || {})[x.id]).length,
-    golds: LEVELS.map((_, i) => !!(best[i] && best[i].gold)), name: save.playerName && save.playerName !== 'Joueur 1' ? save.playerName : ''
+    golds: LEVELS.slice(0, MAIN_WORLDS).map((_, i) => !!(best[i] && best[i].gold)), // une lanterne par monde de l'aventure name: save.playerName && save.playerName !== 'Joueur 1' ? save.playerName : ''
   };
   rec = null; ghost = null; replay = null; dailyRun = null; particles = []; ambient.length = 0; // ni particules ni décor du dernier monde
   hidePanels(); document.body.classList.remove('playing'); releaseAllTouch(); armBack();

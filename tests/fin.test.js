@@ -32,7 +32,7 @@ test('la scène se lance, retient le joueur, fait le bilan et joue sa musique', 
   assert.equal(d.score, 1500); assert.equal(d.gems, 5); assert.equal(d.gold, 1); assert.equal(d.ach, 1);
   assert.deepEqual(d.golds.map(Number), [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   assert.equal(m.ev('mus.pending'), 13, 'musique de fin');
-  assert.equal(m.ev('SONGS.length'), 14);
+  assert.equal(m.ev('SONGS.length'), 15); // 13 mondes, la fin, le Jardin d'or
 });
 
 test('la scène se déroule seule, se dessine à chaque instant, et ne joue pas la partie', () => {
